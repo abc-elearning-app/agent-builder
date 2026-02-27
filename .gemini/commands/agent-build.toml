@@ -1,0 +1,9 @@
+description = "Auto-generate an AI agent from a natural language description, run it immediately, and refine through a feedback loop"
+
+prompt = """
+@{agent-build.md}
+
+---
+
+User description: {{args}}
+"""

@@ -6,15 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKFLOW_FILE="$SCRIPT_DIR/agent-build.md"
-
-# Detect target directory
-if [ -d ".agent/workflows" ]; then
-    TARGET_DIR=".agent/workflows"
-elif [ -d ".claude/commands" ]; then
-    TARGET_DIR=".claude/commands"
-else
-    TARGET_DIR=".agent/workflows"
-fi
+TOML_FILE="$SCRIPT_DIR/.gemini/commands/agent-build.toml"
 
 # Check if workflow file exists
 if [ ! -f "$WORKFLOW_FILE" ]; then
@@ -23,13 +15,38 @@ if [ ! -f "$WORKFLOW_FILE" ]; then
     exit 1
 fi
 
-# Create target directory
-mkdir -p "$TARGET_DIR"
+# ── Claude Code (.claude/commands/) ──────────────────────────────────────────
+mkdir -p ".claude/commands"
+cp "$WORKFLOW_FILE" ".claude/commands/agent-build.md"
+echo "✅ Claude Code: .claude/commands/agent-build.md"
 
-# Copy workflow
-cp "$WORKFLOW_FILE" "$TARGET_DIR/agent-build.md"
+# ── Gemini CLI (.gemini/commands/) ───────────────────────────────────────────
+mkdir -p ".gemini/commands"
+if [ -f "$TOML_FILE" ]; then
+    cp "$TOML_FILE" ".gemini/commands/agent-build.toml"
+    echo "✅ Gemini CLI:  .gemini/commands/agent-build.toml"
+else
+    # Generate TOML on the fly if source doesn't exist
+    cat > ".gemini/commands/agent-build.toml" <<'EOF'
+description = "Auto-generate an AI agent from a natural language description, run it immediately, and refine through a feedback loop"
 
-# Copy examples if they exist
+prompt = """
+@{agent-build.md}
+
+---
+
+User description: {{args}}
+"""
+EOF
+    echo "✅ Gemini CLI:  .gemini/commands/agent-build.toml (generated)"
+fi
+
+# ── Antigravity / generic (.agent/workflows/) ─────────────────────────────────
+mkdir -p ".agent/workflows"
+cp "$WORKFLOW_FILE" ".agent/workflows/agent-build.md"
+echo "✅ Antigravity:  .agent/workflows/agent-build.md"
+
+# ── Copy examples if they exist ───────────────────────────────────────────────
 if [ -d "$SCRIPT_DIR/examples" ]; then
     AGENT_DIR="./agents"
     if [ -d ".claude/agents" ]; then
@@ -50,12 +67,13 @@ if [ -d "$SCRIPT_DIR/examples" ]; then
 fi
 
 echo ""
-echo "✅ Agent Builder installed!"
-echo "   Workflow: $TARGET_DIR/agent-build.md"
+echo "✅ Agent Builder installed for all supported IDEs!"
 echo ""
 echo "📖 Usage:"
-echo '   @[/agent-build] "mô tả agent của bạn"'
+echo "   Claude Code:  /agent-build \"mô tả agent của bạn\""
+echo "   Gemini CLI:   /agent-build \"mô tả agent của bạn\""
+echo "   Antigravity:  @[/agent-build] \"mô tả agent của bạn\""
 echo ""
 echo "📚 Examples:"
-echo '   @[/agent-build] "thu thập tiêu đề bài viết từ một trang web"'
-echo '   @[/agent-build] "review code Python và đưa ra gợi ý"'
+echo '   /agent-build "thu thập tiêu đề bài viết từ một trang web"'
+echo '   /agent-build "review code Python và đưa ra gợi ý"'

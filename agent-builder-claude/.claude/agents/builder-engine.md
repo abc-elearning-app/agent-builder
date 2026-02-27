@@ -152,7 +152,10 @@ model: inherit
 **For commands:** Write to `.claude/commands/{name}.md`
 **For agents:** Write to `.claude/agents/{name}.md`
 
-Use the Write tool to create the file.
+**Overwrite check:** Before writing, use Glob to check if the target file already exists:
+- If file exists → report: "⚠️ File đã tồn tại: {path}. Ghi đè với nội dung mới."
+- If the prompt from /agent-builder includes explicit confirmation → proceed with overwrite
+- Write the file using the Write tool
 
 After writing, proceed to Step 6.
 
@@ -216,6 +219,38 @@ File: {file_path}
 Tools: {tools_used}
 Validation: {PASS | FAIL after N rounds}
 ```
+
+### Step 8: Vietnamese Explanation
+
+After successful generation, provide a friendly Vietnamese explanation to the user:
+
+```
+📋 Giải thích:
+
+📍 File đã tạo: {file_path}
+   → Đây là {một slash command / một subagent} cho Claude Code.
+
+🚀 Cách chạy:
+   {Nếu command:} → Gõ /{name} trong Claude Code
+   {Nếu command có arguments:} → Gõ /{name} <input> (vd: /{name} src/app.ts)
+   {Nếu agent:} → Agent này được gọi tự động khi phù hợp, hoặc qua Task tool
+
+🔧 Nó làm gì:
+   {1-2 câu mô tả chức năng chính, dựa trên description}
+
+💡 Ví dụ sử dụng:
+   {1-2 ví dụ cụ thể, thực tế}
+
+📖 Khái niệm:
+   {Nếu command:} → Slash command = lệnh chạy một tác vụ cụ thể. Giống shortcut.
+   {Nếu agent:} → Subagent = trợ lý chuyên biệt với "nhân cách" riêng. Nó hiểu context và đưa ra judgment.
+```
+
+**Rules for explanation:**
+- Always in Vietnamese
+- Friendly, accessible tone — assume user is new to Claude Code
+- Include at least 1 concrete usage example
+- Keep it concise but informative (5-10 lines)
 
 ## Quality Standards
 

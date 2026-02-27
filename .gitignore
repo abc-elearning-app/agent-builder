@@ -18,18 +18,23 @@ Thumbs.db
 # Temp
 weather-reminder/
 
-# Email automation — OAuth credentials & runtime state (NEVER commit these)
-gmail_credentials.json
-gmail_token.json
-processed_email_ids.json
+# Projects workspace — local only by default; each project lives on its own branch
+# On a project branch, the specific project folder is un-ignored via negation
+projects/*
+!projects/email-automation
+
+# Runtime state & secrets (NEVER commit)
+**/processed_email_ids.json
+**/gmail_credentials.json
+**/gmail_token.json
 
 # Python
-__pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
-.venv/
-venv/
-env/
+**/.venv/
+**/venv/
+**/env/
 *.egg-info/
 dist/
 build/

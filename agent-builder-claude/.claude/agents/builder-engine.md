@@ -154,11 +154,67 @@ model: inherit
 
 Use the Write tool to create the file.
 
-After writing, report:
+After writing, proceed to Step 6.
+
+### Step 6: Validate & Refine
+
+After writing the file, run the validation + refinement loop.
+
+**Loop (max 5 rounds):**
+
+```
+Round = 1
+While Round <= 5:
+  1. Run validator:
+     Bash: validators/validate-claude.sh {file_path} {type}
+
+  2. If exit code 0 (PASS):
+     → Report: "✅ Validation passed on round {Round}"
+     → Break loop — done!
+
+  3. If exit code 1 (FAIL):
+     → Parse ERROR lines from output
+     → Report: "🔄 Round {Round}/5: Fixing {error_summary}"
+     → Fix priority: format errors first, then logic errors
+     → Use Edit tool to fix the generated file
+     → Round = Round + 1
+
+If Round > 5 (all rounds exhausted):
+  → Report diagnostic:
+    "⚠️ Could not fully fix after 5 rounds. Remaining issues:"
+    {list remaining errors}
+    "Suggestions:"
+    - Review the file manually
+    - Check if the requirements are too complex
+    - Try simplifying the description
+```
+
+**Fix priority order:**
+1. Missing/malformed frontmatter `---` markers
+2. Missing required fields (`description`, `name`, `tools`)
+3. Tab characters → replace with spaces
+4. Invalid tool names → replace with closest valid tool
+5. `$ARGUMENTS` consistency → add `argument-hint` if missing
+6. Semantic issues (unclear instructions, missing sections)
+
+**Semantic check (after structural validation passes):**
+Review the generated file for quality:
+- Are instructions clear and actionable?
+- Does the description accurately reflect what the command/agent does?
+- Are tools minimal but sufficient?
+- For agents: is the persona well-defined?
+
+If semantic issues found, fix in the same round (counts toward the 5-round limit).
+
+### Step 7: Report Result
+
+After the loop completes (pass or max rounds), report:
+
 ```
 Generated: {type} "{name}"
 File: {file_path}
 Tools: {tools_used}
+Validation: {PASS | FAIL after N rounds}
 ```
 
 ## Quality Standards
@@ -173,7 +229,5 @@ Every generated file MUST:
 
 ## What You Do NOT Do
 
-- Do NOT validate the generated file (that is the validator's job — T012)
-- Do NOT run a refinement loop (that is T012's scope)
 - Do NOT modify existing files unless explicitly asked
 - Do NOT ask the user questions — you receive complete requirements from /agent-builder

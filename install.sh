@@ -22,6 +22,7 @@ echo "✅ Claude Code: .claude/commands/agent-build.md"
 
 # ── Gemini CLI (.gemini/commands/) ───────────────────────────────────────────
 mkdir -p ".gemini/commands"
+cp "$WORKFLOW_FILE" ".gemini/commands/agent-build.md"
 if [ -f "$TOML_FILE" ]; then
     cp "$TOML_FILE" ".gemini/commands/agent-build.toml"
     echo "✅ Gemini CLI:  .gemini/commands/agent-build.toml"

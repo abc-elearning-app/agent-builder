@@ -19,12 +19,21 @@ cp agent-build.md .agent/workflows/
 
 ### 2. Sử dụng
 
-Trong Antigravity (hoặc bất kỳ AI IDE hỗ trợ workflows):
+**Claude Code:**
+```
+/agent-build "thu thập tiêu đề và URL bài viết từ một trang web"
+/agent-build "review code Python và đưa ra gợi ý cải thiện"
+/agent-build "tổng hợp các key points từ một tài liệu dài"
+```
 
+**Gemini CLI:**
+```
+/agent-build "thu thập tiêu đề và URL bài viết từ một trang web"
+```
+
+**Antigravity:**
 ```
 @[/agent-build] "thu thập tiêu đề và URL bài viết từ một trang web"
-@[/agent-build] "review code Python và đưa ra gợi ý cải thiện"
-@[/agent-build] "tổng hợp các key points từ một tài liệu dài"
 ```
 
 ### 3. Kết quả

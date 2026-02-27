@@ -72,7 +72,7 @@ Auto-detect agent type từ description bằng keyword matching (xem **Agent Typ
 ### Step 2: Learn Agent Format
 
 1. **Check existing agents:** Glob `<agent_dir>/*.md` — nếu tìm được → đọc file đầu tiên làm format reference
-2. **Check examples:** Nếu không có agents → tìm thư mục `examples/` cùng cấp với workflow file này, đọc 1 file mẫu
+2. **Check examples:** Nếu không có agents → tìm `examples/*.md` ở project root, đọc 1 file mẫu
 3. **Minimal fallback:** Nếu không có gì → dùng built-in format:
    ```yaml
    ---

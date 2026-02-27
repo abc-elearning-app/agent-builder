@@ -15,7 +15,7 @@ There is no build system, package manager, or test runner. The "code" is markdow
 ./install.sh
 ```
 
-`install.sh` detects the target directory in order: `.agent/workflows/` → `.claude/commands/` → creates `.agent/workflows/`. It copies `agent-build.md` and optionally copies example agents.
+`install.sh` installs to all three supported IDEs simultaneously: `.claude/commands/` (Claude Code), `.gemini/commands/` (Gemini CLI), and `.agent/workflows/` (Antigravity). It optionally copies example agents to the detected agent directory.
 
 For Gemini CLI specifically, the workflow is installed at `.gemini/commands/agent-build.toml`.
 

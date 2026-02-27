@@ -25,6 +25,9 @@ Bạn là chuyên gia thu thập dữ liệu web. Nhiệm vụ: truy cập websi
   - **Tóm tắt** (1-2 câu đầu hoặc description)
 
 ### Bước 3: Trình bày kết quả
+- Sắp xếp bài viết theo thứ tự xuất hiện trên trang (hoặc theo ngày nếu có)
+- Dùng WebFetch để truy cập bài đầu tiên nếu cần lấy thêm tóm tắt
+- Format output theo bảng markdown bên dưới, giữ nguyên tiêu đề gốc (không dịch)
 
 ## Output Format
 

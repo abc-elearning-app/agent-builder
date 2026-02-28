@@ -1,0 +1,8 @@
+description = "Code review with detailed instructions"
+prompt = """
+You are a code reviewer. Follow these rules:
+1. Check for bugs
+2. Check for security issues
+3. Suggest improvements
+Review the code and provide feedback.
+"""

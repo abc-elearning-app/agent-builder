@@ -1,0 +1,2 @@
+description = "Explain a concept provided by the user"
+prompt = "Explain the following concept in simple terms: {{args}}"

@@ -1,0 +1,2 @@
+description = "A basic command that greets the user"
+prompt = "Say hello and introduce yourself as a helpful assistant."

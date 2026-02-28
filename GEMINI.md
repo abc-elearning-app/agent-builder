@@ -1,6 +1,6 @@
-# CLAUDE.md
+# GEMINI.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Gemini CLI when working with code in this repository.
 
 ## What This Repo Is
 
@@ -17,9 +17,9 @@ There is no build system, package manager, or test runner. The "code" is markdow
 
 `install.sh` installs to all three supported IDEs simultaneously: `.claude/commands/` (Claude Code), `.gemini/commands/` (Gemini CLI), and `.agent/workflows/` (Antigravity). It optionally copies example agents to the detected agent directory.
 
-## Usage
+For Gemini CLI specifically, the workflow is installed at `.gemini/commands/agent-build.toml`.
 
-After installation, invoke in any AI IDE that supports workflows:
+## Usage
 
 ```
 /agent-build "thu thập tiêu đề bài viết từ VnExpress"
@@ -29,10 +29,10 @@ After installation, invoke in any AI IDE that supports workflows:
 
 ## Key Files
 
-- `agent-build.md` — The main workflow definition (source of truth). Also symlinked/copied to `.agent/workflows/agent-build.md`.
+- `agent-build.md` — The main workflow definition (source of truth for all IDEs).
+- `.gemini/commands/agent-build.toml` — Gemini CLI slash command wrapper.
 - `install.sh` — Copies the workflow into a target project.
 - `examples/` — Three reference agent files: `web-scraper.md`, `code-reviewer.md`, `data-analyzer.md`.
-- `agent-builder-claude/` — Phase 1 Claude Code-specific builder (command + subagent + templates + validator).
 
 ## Agent File Format
 
@@ -63,7 +63,7 @@ The `agent-build.md` workflow runs these steps:
 3. **Type Classification** — Auto-detect one of 4 agent types by keyword matching (supports EN + VI).
 4. **Learn Format** — Read an existing agent or example file to infer format conventions.
 5. **Generate Agent** — Name (kebab-case), select tools (3-tier safety model), write system prompt, create file, validate (3-step).
-6. **Immediate Execution** — Spawn the generated agent via Task tool.
+6. **Immediate Execution** — Run the generated agent.
 7. **Refinement Loop** — Accept feedback, update agent definition, re-run (max 10 iterations).
 
 ## Agent Types & Tool Safety
@@ -77,12 +77,12 @@ The `agent-build.md` workflow runs these steps:
 
 **3-tier tool safety:**
 - **Safe** (auto): Read, Glob, Grep, LS, WebFetch, WebSearch
-- **Cautious** (auto + warn): Write, Edit, NotebookEdit
+- **Cautious** (auto + warn): Write, Edit
 - **Restricted** (always ask user): Bash, Task, Agent
 
 ## Editing the Workflow
 
-The canonical source is `agent-build.md` in the repo root. The copy at `.agent/workflows/agent-build.md` is kept in sync — if you edit one, update the other (or re-run `install.sh`).
+The canonical source is `agent-build.md` in the repo root. All IDE-specific wrappers (`.gemini/commands/agent-build.toml`, `.claude/commands/agent-build.md`, `.agent/workflows/agent-build.md`) reference or copy this file.
 
 When modifying the workflow logic in `agent-build.md`, keep these constraints:
 - Clarification step: max 3 questions total

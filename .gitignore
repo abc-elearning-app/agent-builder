@@ -1,3 +1,6 @@
+# CCPM tooling (internal — never commit)
+.claude/
+
 # Agent Builder
 .env
 *.log

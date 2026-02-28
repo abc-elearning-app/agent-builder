@@ -1,0 +1,2 @@
+description = "Review the current git diff"
+prompt = "Review these changes and suggest improvements:\n!{git diff}"

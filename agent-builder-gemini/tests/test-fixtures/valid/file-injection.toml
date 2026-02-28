@@ -1,0 +1,2 @@
+description = "Summarize a file"
+prompt = "Summarize the contents of this file:\n@{README.md}"

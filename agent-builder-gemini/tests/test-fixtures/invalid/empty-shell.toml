@@ -1,0 +1,2 @@
+description = "Command with empty shell injection"
+prompt = "Show the result of: !{}"

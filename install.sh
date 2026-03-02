@@ -28,6 +28,7 @@ fi
 # ── Gemini CLI (.gemini/commands/) ───────────────────────────────────────────
 mkdir -p ".gemini/commands"
 cp "$WORKFLOW_FILE" ".gemini/commands/agent-factory.md"
+echo "✅ Gemini CLI:  .gemini/commands/agent-factory.md"
 if [ -f "$SHARED_WORKFLOW_FILE" ]; then
     cp "$SHARED_WORKFLOW_FILE" ".gemini/commands/agent-shared.md"
     echo "✅ Gemini CLI:  .gemini/commands/agent-shared.md"

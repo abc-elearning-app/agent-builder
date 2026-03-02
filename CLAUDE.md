@@ -82,7 +82,7 @@ The `agent-factory.md` workflow runs these steps:
 
 ## Editing the Workflow
 
-The canonical source is `agent-factory.md` in the repo root. The copy at `.agent/workflows/agent-factory.md` is kept in sync — if you edit one, update the other (or re-run `install.sh`).
+The canonical source is `agent-factory.md` in the repo root. All IDE-specific locations (`.claude/commands/`, `.gemini/commands/`, `.agent/workflows/`) are **symlinks** pointing to the root file — edits auto-sync across all platforms.
 
 When modifying the workflow logic in `agent-factory.md`, keep these constraints:
 - Clarification step: max 3 questions total

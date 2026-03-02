@@ -281,24 +281,53 @@ Kết quả có đúng ý bạn không?
   ```
 
 **Khi user gõ "done":**
+
 ```
 ✅ Agent '<name>' đã sẵn sàng.
    Saved: <agent_dir>/<name>.md
    Tools: <tools>
+```
 
-📤 Bạn muốn share agent này cho team không?
-   1. Share → Tạo PR vào agents-shared repo
-   2. Skip → Giữ local, share sau
+Tiếp theo, hỏi lần lượt 2 câu:
+
+**Câu 1 — Push lên GitHub:**
+```
+📤 Bạn muốn commit và push agent lên GitHub không?
+   1. Push → Commit file agent và push lên branch hiện tại
+   2. Skip → Giữ local, không push
 
 Chọn (1-2): ___
 ```
 
-- Nếu user chọn **1 (Share)** → chuyển sang **Step 6: Publish to Shared**
+- Nếu user chọn **1 (Push)**:
+  ```bash
+  git add <agent_dir>/<name>.md
+  git commit -m "Add agent: <name>"
+  git push
+  ```
+  Hiển thị:
+  ```
+  ✅ Đã push agent '<name>' lên GitHub.
+  ```
+  Nếu push fail → hiển thị lỗi, gợi ý `git push` thủ công.
+
+- Nếu user chọn **2 (Skip)** → tiếp tục câu 2.
+
+**Câu 2 — Merge vào agents-shared:**
+```
+🔀 Bạn muốn merge agent này vào agents-shared cho team không?
+   1. Merge → Copy agent vào agents-shared repo và tạo PR
+   2. Skip → Giữ riêng, share sau
+
+Chọn (1-2): ___
+```
+
+- Nếu user chọn **1 (Merge)** → chuyển sang **Step 6: Publish to Shared**
 - Nếu user chọn **2 (Skip)** → hiển thị:
   ```
   Để chạy lại agent sau: /agent-factory "<description gốc>"
   Để chỉnh sửa thủ công: Edit <agent_dir>/<name>.md
-  Để share sau: copy file vào agents-shared repo và mở PR
+  Để share sau: copy file vào agents-shared/agents/<category>/ và mở PR
   ```
 
 ### Step 6: Publish to Shared (optional)
@@ -307,11 +336,13 @@ Chỉ chạy khi user chọn "Share" ở Step 5.
 
 #### 6a. Detect shared repo
 
-Tìm `agents-shared` repo theo thứ tự:
-1. `../agents-shared/` (sibling directory)
-2. Hỏi user path nếu không tìm thấy:
+Tìm agents-shared repo theo thứ tự:
+1. `./shared-repo/` (trong project hiện tại)
+2. `../agents-shared/` (sibling directory)
+3. `../shared-repo/` (sibling directory)
+4. Hỏi user path nếu không tìm thấy:
    ```
-   📁 Không tìm thấy agents-shared repo tại ../agents-shared/
+   📁 Không tìm thấy agents-shared repo.
       Nhập path đến agents-shared repo (hoặc "cancel" để huỷ): ___
    ```
 
@@ -377,7 +408,7 @@ Sau khi PR được approve, agent sẽ available cho toàn team.
 ```
 ❌ Publish failed: <error>
    Agent vẫn đã lưu tại: <agent_dir>/<name>.md
-   Để publish thủ công: copy file vào agents-shared repo và mở PR
+   Để publish thủ công: copy file vào agents-shared/agents/<category>/ và mở PR
 ```
 
 ## IMPORTANT
@@ -388,7 +419,7 @@ Sau khi PR được approve, agent sẽ available cho toàn team.
 - **Overwrite on refinement** — mỗi iteration ghi đè file, không tạo versions
 - **Fail fast** — nếu agent crash, fix trước khi loop
 - **IDE-agnostic** — hoạt động với Antigravity, Claude Code, hoặc bất kỳ AI IDE nào hỗ trợ workflow
-- **Publish optional** — share agent lên shared repo là tuỳ chọn, không bắt buộc
+- **Push + Share optional** — commit/push lên GitHub và merge vào agents-shared đều là tuỳ chọn, không bắt buộc
 
 ## Agent Type Reference
 

@@ -5,6 +5,10 @@
 .env
 *.log
 
+# Generated presentation files (source: presentation.md)
+presentation.html
+presentation.pdf
+
 # OS
 .DS_Store
 Thumbs.db

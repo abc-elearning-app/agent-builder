@@ -6,6 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKFLOW_FILE="$SCRIPT_DIR/agent-factory.md"
+SHARED_WORKFLOW_FILE="$SCRIPT_DIR/agent-shared.md"
 TOML_FILE="$SCRIPT_DIR/.gemini/commands/agent-factory.toml"
 
 # Check if workflow file exists
@@ -19,10 +20,18 @@ fi
 mkdir -p ".claude/commands"
 cp "$WORKFLOW_FILE" ".claude/commands/agent-factory.md"
 echo "✅ Claude Code: .claude/commands/agent-factory.md"
+if [ -f "$SHARED_WORKFLOW_FILE" ]; then
+    cp "$SHARED_WORKFLOW_FILE" ".claude/commands/agent-shared.md"
+    echo "✅ Claude Code: .claude/commands/agent-shared.md"
+fi
 
 # ── Gemini CLI (.gemini/commands/) ───────────────────────────────────────────
 mkdir -p ".gemini/commands"
 cp "$WORKFLOW_FILE" ".gemini/commands/agent-factory.md"
+if [ -f "$SHARED_WORKFLOW_FILE" ]; then
+    cp "$SHARED_WORKFLOW_FILE" ".gemini/commands/agent-shared.md"
+    echo "✅ Gemini CLI:  .gemini/commands/agent-shared.md"
+fi
 if [ -f "$TOML_FILE" ]; then
     cp "$TOML_FILE" ".gemini/commands/agent-factory.toml"
     echo "✅ Gemini CLI:  .gemini/commands/agent-factory.toml"
@@ -46,6 +55,10 @@ fi
 mkdir -p ".agent/workflows"
 cp "$WORKFLOW_FILE" ".agent/workflows/agent-factory.md"
 echo "✅ Antigravity:  .agent/workflows/agent-factory.md"
+if [ -f "$SHARED_WORKFLOW_FILE" ]; then
+    cp "$SHARED_WORKFLOW_FILE" ".agent/workflows/agent-shared.md"
+    echo "✅ Antigravity:  .agent/workflows/agent-shared.md"
+fi
 
 # ── Copy examples if they exist ───────────────────────────────────────────────
 if [ -d "$SCRIPT_DIR/examples" ]; then
@@ -78,3 +91,6 @@ echo ""
 echo "📚 Examples:"
 echo '   /agent-factory "thu thập tiêu đề bài viết từ một trang web"'
 echo '   /agent-factory "review code Python và đưa ra gợi ý"'
+echo ""
+echo "🏪 Browse shared agents:"
+echo "   /agent-shared"

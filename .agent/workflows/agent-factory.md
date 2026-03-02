@@ -87,6 +87,8 @@ Auto-detect agent type từ description bằng keyword matching (xem **Agent Typ
    color: {detected_color}
    field: {detected_field}
    expertise: expert
+   author: {author}
+   tags: {tags}
    ---
    ```
 
@@ -157,8 +159,18 @@ model: inherit
 color: {detected_color}
 field: {detected_field}       # optional: frontend|backend|testing|security|data|ai|...
 expertise: expert             # optional: beginner|intermediate|expert
+author: {user_name}           # optional: tên người tạo agent
+tags: {comma-separated}       # optional: keywords để tìm kiếm (ví dụ: scraping, web, api)
 ---
 ```
+
+**Auto-detect `author`:**
+- Lấy từ `git config user.name` (first name, lowercase)
+- Nếu không có → bỏ qua field (optional)
+
+**Auto-detect `tags`:**
+- Trích 2-4 keywords từ description (loại bỏ stop words)
+- Ví dụ: "thu thập tiêu đề bài viết từ VnExpress" → `scraping, vnexpress, article`
 
 **Auto-detect `field`:**
 - Code-related keywords → `backend` / `frontend` / `fullstack`
@@ -196,9 +208,12 @@ Sau khi tạo file, chạy validation trước khi execute:
 
 **Step V2: YAML validation**
 - Required fields: `name`, `description`, `tools`, `model`, `color`
+- Optional fields: `field`, `expertise`, `author`, `tags`
 - `tools` phải là comma-separated string (không phải array)
 - `model` hợp lệ: `sonnet` | `opus` | `haiku` | `inherit`
 - `color` hợp lệ: `blue` | `green` | `red` | `purple` | `orange`
+- `author`: string, nếu có
+- `tags`: comma-separated string, nếu có
 - **Auto-fix:** missing `color` → assign từ type; missing `model` → `inherit`
 
 **Step V3: Description quality** (warn only, không block)
@@ -271,8 +286,98 @@ Kết quả có đúng ý bạn không?
    Saved: <agent_dir>/<name>.md
    Tools: <tools>
 
-Để chạy lại agent sau: /agent-factory "<description gốc>"
-Để chỉnh sửa thủ công: Edit <agent_dir>/<name>.md
+📤 Bạn muốn share agent này cho team không?
+   1. Share → Tạo PR vào agents-shared repo
+   2. Skip → Giữ local, share sau
+
+Chọn (1-2): ___
+```
+
+- Nếu user chọn **1 (Share)** → chuyển sang **Step 6: Publish to Shared**
+- Nếu user chọn **2 (Skip)** → hiển thị:
+  ```
+  Để chạy lại agent sau: /agent-factory "<description gốc>"
+  Để chỉnh sửa thủ công: Edit <agent_dir>/<name>.md
+  Để share sau: copy file vào agents-shared repo và mở PR
+  ```
+
+### Step 6: Publish to Shared (optional)
+
+Chỉ chạy khi user chọn "Share" ở Step 5.
+
+#### 6a. Detect shared repo
+
+Tìm `agents-shared` repo theo thứ tự:
+1. `../agents-shared/` (sibling directory)
+2. Hỏi user path nếu không tìm thấy:
+   ```
+   📁 Không tìm thấy agents-shared repo tại ../agents-shared/
+      Nhập path đến agents-shared repo (hoặc "cancel" để huỷ): ___
+   ```
+
+Verify: kiểm tra path có chứa `agents/` directory.
+
+#### 6b. Chọn category
+
+```
+📂 Chọn category cho agent:
+
+1. dev      — Development (FE, BE, Mobile)
+2. qa       — Testing, Review, Audit
+3. ops      — Deploy, Infra, Monitoring
+4. data     — Analytics, Scraping, Reporting
+5. content  — Writing, Editing, Translation
+6. marketing — Campaigns, SEO, Social
+7. general  — Cross-team, Utilities
+
+Chọn (1-7): ___
+```
+
+**Auto-suggest:** Dựa trên `field` đã detect ở Step 3:
+- `frontend` / `backend` / `fullstack` → suggest `dev`
+- `testing` / `security` → suggest `qa`
+- `data` → suggest `data`
+- Không match → suggest `general`
+
+#### 6c. Copy agent file
+
+```bash
+cp <agent_dir>/<name>.md <shared_repo>/agents/<category>/<name>.md
+```
+
+#### 6d. Tạo branch + commit + PR
+
+```bash
+cd <shared_repo>
+git checkout main && git pull origin main
+git checkout -b add/<name>
+git add agents/<category>/<name>.md
+git commit -m "Add <name> agent to <category>"
+git push -u origin add/<name>
+gh pr create --title "Add <name> agent" --body "..."
+```
+
+**PR body** sử dụng template có sẵn trong `.github/pull_request_template.md`, tự động điền:
+- Agent name, category, author
+- Description từ frontmatter
+- Tools list
+
+#### 6e. Hiển thị kết quả
+
+```
+✅ PR created successfully!
+   🔗 <PR_URL>
+   📁 agents/<category>/<name>.md
+   🏷️ Branch: add/<name>
+
+Sau khi PR được approve, agent sẽ available cho toàn team.
+```
+
+**Nếu bất kỳ bước nào fail:**
+```
+❌ Publish failed: <error>
+   Agent vẫn đã lưu tại: <agent_dir>/<name>.md
+   Để publish thủ công: copy file vào agents-shared repo và mở PR
 ```
 
 ## IMPORTANT
@@ -283,6 +388,7 @@ Kết quả có đúng ý bạn không?
 - **Overwrite on refinement** — mỗi iteration ghi đè file, không tạo versions
 - **Fail fast** — nếu agent crash, fix trước khi loop
 - **IDE-agnostic** — hoạt động với Antigravity, Claude Code, hoặc bất kỳ AI IDE nào hỗ trợ workflow
+- **Publish optional** — share agent lên shared repo là tuỳ chọn, không bắt buộc
 
 ## Agent Type Reference
 

@@ -159,11 +159,13 @@ Sau khi chọn agent:
 1. AI tự detect nhóm phù hợp từ `field` của agent (bạn chỉ cần xác nhận hoặc đổi)
 2. AI tạo branch `add/<tên-agent>` trong kho chung
 3. AI tạo Pull Request tự động
-4. Bạn nhận link PR — sau khi được duyệt, agent sẽ available cho toàn team
+4. Bạn nhận link PR
 
 **Bạn không cần biết git** — AI xử lý hoàn toàn.
 
-> **Lưu ý:** Không thể push thẳng lên `main`. Mọi agent đều phải qua Pull Request để đảm bảo chất lượng.
+> **Quan trọng: Agent chưa hoạt động ngay sau khi push.**
+> PR phải được **admin review và merge** vào `main` thì agent mới xuất hiện trong kho chung và team mới cài được.
+> Sau khi tạo PR, hãy nhắn admin để được duyệt sớm.
 
 ---
 

@@ -57,6 +57,8 @@ Menu-driven, chọn số để thao tác:
 
 Kho chung: [`abc-elearning-app/agents-shared`](https://github.com/abc-elearning-app/agents-shared). Auto-clone lần đầu, silent pull mỗi lần mở.
 
+> **Lưu ý:** Agent push lên qua PR — phải được admin review và merge vào `main` thì mới available cho team.
+
 #### `/run-agent` — Chạy agent nhanh
 
 Liệt kê agents trên máy, filter theo từ khoá, chọn số, nhập task và spawn ngay:

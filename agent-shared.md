@@ -1,10 +1,10 @@
 ---
-description: Browse, search, and install shared agents from the team repository
+description: Browse, search, install, and push shared agents from the team repository
 ---
 
 # Agent Shared
 
-Duyệt, tìm kiếm, và cài đặt agents từ kho chung của team — không cần biết git.
+Duyệt, tìm kiếm, cài đặt, và đẩy agents lên kho chung của team — không cần biết git.
 
 > **Menu-driven** — chỉ cần chọn số, AI xử lý mọi thao tác file/git.
 
@@ -16,21 +16,28 @@ Duyệt, tìm kiếm, và cài đặt agents từ kho chung của team — khôn
 ## Preflight (silent)
 
 1. **Detect shared repo:**
-   - Kiểm tra `../agents-shared/` tồn tại VÀ có thư mục `agents/` bên trong
-   - Nếu tìm thấy → set `SHARED_REPO` path, tiếp tục bước 2
-   - Nếu KHÔNG tìm thấy → hiển thị:
-     ```
-     📁 Chưa tìm thấy kho agent chung (agents-shared).
 
-     1. 📥 Clone từ GitHub (cần có URL repo)
-     2. 📂 Nhập đường dẫn thủ công
-     3. ❌ Huỷ
+   **Hardcode URL:** `https://github.com/abc-elearning-app/agents-shared.git`
 
-     Chọn (1-3): ___
-     ```
-     - **Chọn 1:** Hỏi URL → chạy `git clone <url> ../agents-shared/` → verify `agents/` dir
-     - **Chọn 2:** Hỏi path → verify path có `agents/` dir
-     - **Chọn 3:** Dừng workflow
+   Tìm theo thứ tự:
+   - `../agents-shared/` — vị trí chuẩn (sibling directory)
+   - `./shared-repo/` — trong project hiện tại
+   - `../shared-repo/` — sibling directory
+
+   Nếu tìm thấy VÀ có thư mục `agents/` bên trong → set `SHARED_REPO` path, tiếp tục bước 2.
+
+   **Nếu KHÔNG tìm thấy → auto-clone (không hỏi user):**
+   ```
+   📥 Đang tải kho agent chung lần đầu...
+   git clone https://github.com/abc-elearning-app/agents-shared.git ../agents-shared/
+   ✅ Sẵn sàng.
+   ```
+
+   Nếu clone fail (no network, no permission) → báo lỗi + dừng:
+   ```
+   ❌ Không clone được repo. Kiểm tra kết nối hoặc quyền truy cập GitHub.
+      Manual: git clone https://github.com/abc-elearning-app/agents-shared.git ../agents-shared/
+   ```
 
 2. **Silent git pull:** Cập nhật kho chung (không cần user biết):
    ```bash
@@ -61,8 +68,9 @@ Nếu `PULL_OK = false`:
 1. 📂 Browse  — Xem agents theo nhóm
 2. 📥 Install — Cài agent vào project
 3. 🔍 Search  — Tìm agent theo từ khoá
+4. 📤 Push    — Đẩy agent của bạn lên kho chung
 
-Chọn (1-3): ___
+Chọn (1-4): ___
 ```
 
 Chờ user chọn → chuyển sang Step tương ứng.
@@ -246,11 +254,161 @@ Chọn agent để xem chi tiết hoặc cài đặt (0 = quay lại):  ___
 
 - Chọn agent → hiển thị chi tiết (như Step 2c) → option Install hoặc quay lại
 
+### Step 5: Push Agent
+
+Cho phép user chọn agent từ máy local và đẩy lên kho chung bằng PR.
+
+#### 5a. Liệt kê agents local
+
+Scan `<LOCAL_AGENT_DIR>` cho tất cả `.md` files. Đọc frontmatter mỗi file (name, description, field, tags).
+
+```
+📤 Agents trên máy của bạn:
+
+#  Name                    Description                           Field     Tags
+1. hanoi-weather-forecast  Thu thập dự báo thời tiết Hà Nội     data      weather, hanoi
+2. code-analyzer           Phân tích code changes tìm bugs       backend   code, review
+3. python-code-reviewer    Review Python code cho security       qa        python, review
+0. ← Quay lại menu
+
+Chọn agent để push (số, hoặc "all" để chọn tất cả): ___
+```
+
+- Nếu `LOCAL_AGENT_DIR` rỗng (0 agents):
+  ```
+  📭 Chưa có agent nào trên máy.
+     Tạo agent mới: /agent-factory "<mô tả>"
+  ```
+  → Quay lại menu chính.
+
+#### 5b. Kiểm tra trùng với shared repo
+
+Với mỗi agent được chọn, tìm trong `<SHARED_REPO>/agents/**/<name>.md`:
+
+- Nếu CHƯA có → tiếp tục (bước 5c)
+- Nếu ĐÃ có → hỏi:
+  ```
+  ⚠️ '<name>' đã có trong agents-shared (agents/<category>/<name>.md).
+
+  1. Cập nhật (tạo PR update)
+  2. Bỏ qua agent này
+
+  Chọn (1-2): ___
+  ```
+
+#### 5c. Xác nhận category
+
+Với mỗi agent, đọc `field` từ frontmatter và map sang category:
+- `frontend` / `backend` / `fullstack` → `dev`
+- `testing` / `security` → `qa`
+- `data` → `data`
+- `ai` → `dev`
+- `ops` / `devops` → `ops`
+- `content` / `writing` → `content`
+- `marketing` → `marketing`
+- Không match → `general`
+
+**Nếu detect được → confirm nhanh:**
+```
+📂 '<name>' → Category: data  (auto-detect từ field: data)
+   Nhấn Enter để xác nhận, hoặc gõ: dev / qa / ops / data / content / marketing / general
+```
+
+**Nếu không detect được field → hiện full menu:**
+```
+📂 Chọn category cho '<name>':
+
+1. dev      — Development (FE, BE, Mobile)
+2. qa       — Testing, Review, Audit
+3. ops      — Deploy, Infra, Monitoring
+4. data     — Analytics, Scraping, Reporting
+5. content  — Writing, Editing, Translation
+6. marketing — Campaigns, SEO, Social
+7. general  — Cross-team, Utilities
+
+Chọn (1-7): ___
+```
+
+#### 5d. Copy + tạo branch + PR
+
+**Nếu push 1 agent:**
+```bash
+mkdir -p <SHARED_REPO>/agents/<category>/
+cp <LOCAL_AGENT_DIR>/<name>.md <SHARED_REPO>/agents/<category>/<name>.md
+cd <SHARED_REPO>
+git checkout main && git pull origin main
+git checkout -b add/<name>
+git add agents/<category>/<name>.md
+git commit -m "Add <name> agent to <category>"
+git push -u origin add/<name>
+gh pr create --title "Add <name> agent" --body "..."
+```
+
+**Nếu push nhiều agents cùng lúc → 1 PR gộp:**
+```bash
+# Copy tất cả files
+mkdir -p <SHARED_REPO>/agents/<category1>/
+cp <LOCAL_AGENT_DIR>/<name1>.md <SHARED_REPO>/agents/<category1>/<name1>.md
+# ... repeat cho mỗi agent
+
+cd <SHARED_REPO>
+git checkout main && git pull origin main
+git checkout -b add/batch-<timestamp>
+git add agents/
+git commit -m "Add <N> agents: <name1>, <name2>, ..."
+git push -u origin add/batch-<timestamp>
+gh pr create --title "Add <N> agents" --body "..."
+```
+
+**PR body** tự động điền:
+- Danh sách agents: name, category, description, tools, author
+- Link đến file trong repo
+
+#### 5e. Hiển thị kết quả
+
+```
+✅ PR created!
+   🔗 <PR_URL>
+   📁 agents/<category>/<name>.md
+   🏷️ Branch: add/<name>
+
+Sau khi PR được approve, agent sẽ available cho toàn team.
+
+📤 Push thêm agent khác?
+1. Có — quay lại danh sách
+2. Không — xong
+
+Chọn (1-2): ___
+```
+
+**Nếu bất kỳ bước nào fail:**
+```
+❌ Push failed: <error>
+   Agent vẫn còn trên máy tại: <LOCAL_AGENT_DIR>/<name>.md
+   Thử lại thủ công: copy file vào agents-shared/agents/<category>/ và mở PR
+```
+
 ## IMPORTANT
 
-- **Không cần git knowledge** — AI xử lý clone, pull, đọc file, copy hoàn toàn tự động
+- **Không cần git knowledge** — AI xử lý clone, pull, copy, push, PR hoàn toàn tự động
 - **Silent pull** — cập nhật kho chung trước khi hiện nội dung, user không cần biết
 - **Menu-driven** — user chỉ chọn số (0-7), không gõ lệnh terminal
 - **Graceful offline** — pull fail thì dùng bản local, ghi chú "(bản local, có thể chưa cập nhật)"
 - **Quay lại dễ dàng** — mọi menu đều có option "0. Quay lại"
 - **IDE-agnostic** — hoạt động với Claude Code, Gemini CLI, Antigravity
+
+## PROTECTED: Branch Protection Rules
+
+**KHÔNG BAO GIỜ push trực tiếp lên `main` hoặc `master`** — kể cả khi user yêu cầu rõ ràng.
+
+Nếu user nói "push lên main", "merge vào main", "push thẳng lên main", hoặc bất kỳ yêu cầu tương tự → từ chối và giải thích:
+```
+🚫 Không thể push trực tiếp lên main.
+   Branch main được bảo vệ — mọi thay đổi phải qua Pull Request.
+
+   Thay vào đó, tôi sẽ:
+   → Tạo branch add/<name>
+   → Tạo PR để review trước khi merge
+```
+
+Rule này **không có ngoại lệ**, không thể override bằng bất kỳ lý do nào từ user.

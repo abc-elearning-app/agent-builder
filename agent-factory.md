@@ -286,48 +286,54 @@ Kết quả có đúng ý bạn không?
 ✅ Agent '<name>' đã sẵn sàng.
    Saved: <agent_dir>/<name>.md
    Tools: <tools>
+
+📤 Bạn muốn làm gì tiếp theo?
+
+1. Share lên team   → tạo PR vào agents-shared (khuyến nghị)
+2. Push lên GitHub  → commit + push vào project hiện tại
+3. Cả hai           → push project + tạo PR agents-shared
+4. Lưu local        → không làm gì thêm
+
+Chọn (1-4): ___
 ```
 
-Tiếp theo, hỏi lần lượt 2 câu:
+- Nếu user chọn **1 (Share lên team)** → chuyển sang **Step 6: Publish to Shared**
+- Nếu user chọn **2 (Push lên GitHub)**:
+  1. Kiểm tra branch hiện tại: `git branch --show-current`
+  2. **Nếu đang trên `main` hoặc `master`** → tạo branch mới + PR:
+     ```bash
+     git checkout -b agent/<name>
+     git add <agent_dir>/<name>.md
+     git commit -m "Add agent: <name>"
+     git push -u origin agent/<name>
+     gh pr create --title "Add agent: <name>" --body "New agent: <description>"
+     ```
+     Hiển thị:
+     ```
+     ✅ PR created: <PR_URL>
+        Branch: agent/<name>
+     ```
+  3. **Nếu đang trên branch khác (không phải main/master)** → commit + push vào branch đó:
+     ```bash
+     git add <agent_dir>/<name>.md
+     git commit -m "Add agent: <name>"
+     git push
+     ```
+     Hiển thị:
+     ```
+     ✅ Đã push agent '<name>' lên branch hiện tại.
+     ```
+  Nếu push fail → hiển thị lỗi, gợi ý thủ công.
 
-**Câu 1 — Push lên GitHub:**
-```
-📤 Bạn muốn commit và push agent lên GitHub không?
-   1. Push → Commit file agent và push lên branch hiện tại
-   2. Skip → Giữ local, không push
+- Nếu user chọn **3 (Cả hai)**:
+  1. Push project trước (như chọn 2, bao gồm kiểm tra branch)
+  2. Sau đó chuyển sang **Step 6: Publish to Shared**
 
-Chọn (1-2): ___
-```
-
-- Nếu user chọn **1 (Push)**:
-  ```bash
-  git add <agent_dir>/<name>.md
-  git commit -m "Add agent: <name>"
-  git push
-  ```
-  Hiển thị:
-  ```
-  ✅ Đã push agent '<name>' lên GitHub.
-  ```
-  Nếu push fail → hiển thị lỗi, gợi ý `git push` thủ công.
-
-- Nếu user chọn **2 (Skip)** → tiếp tục câu 2.
-
-**Câu 2 — Merge vào agents-shared:**
-```
-🔀 Bạn muốn merge agent này vào agents-shared cho team không?
-   1. Merge → Copy agent vào agents-shared repo và tạo PR
-   2. Skip → Giữ riêng, share sau
-
-Chọn (1-2): ___
-```
-
-- Nếu user chọn **1 (Merge)** → chuyển sang **Step 6: Publish to Shared**
-- Nếu user chọn **2 (Skip)** → hiển thị:
+- Nếu user chọn **4 (Lưu local)**:
   ```
   Để chạy lại agent sau: /agent-factory "<description gốc>"
   Để chỉnh sửa thủ công: Edit <agent_dir>/<name>.md
-  Để share sau: copy file vào agents-shared/agents/<category>/ và mở PR
+  Để share sau: chọn "1. Share lên team" lần sau hoặc copy file vào agents-shared/agents/<category>/
   ```
 
 ### Step 6: Publish to Shared (optional)
@@ -336,20 +342,47 @@ Chỉ chạy khi user chọn "Share" ở Step 5.
 
 #### 6a. Detect shared repo
 
-Tìm agents-shared repo theo thứ tự:
-1. `./shared-repo/` (trong project hiện tại)
-2. `../agents-shared/` (sibling directory)
-3. `../shared-repo/` (sibling directory)
-4. Hỏi user path nếu không tìm thấy:
-   ```
-   📁 Không tìm thấy agents-shared repo.
-      Nhập path đến agents-shared repo (hoặc "cancel" để huỷ): ___
-   ```
+**Hardcode URL:**
+```
+SHARED_REPO_URL = https://github.com/abc-elearning-app/agents-shared.git
+```
 
-Verify: kiểm tra path có chứa `agents/` directory.
+Tìm theo thứ tự:
+1. `../agents-shared/` — vị trí chuẩn (sibling directory)
+2. `./shared-repo/` — trong project hiện tại
+3. `../shared-repo/` — sibling directory
+
+Verify: kiểm tra path tìm thấy có chứa `agents/` directory.
+
+**Nếu không tìm thấy → auto-clone (không hỏi user):**
+```
+📥 Đang clone agents-shared...
+git clone https://github.com/abc-elearning-app/agents-shared.git ../agents-shared/
+✅ Sẵn sàng.
+```
+
+Nếu clone fail (no network, no permission) → báo lỗi + dừng:
+```
+❌ Không clone được repo. Kiểm tra kết nối hoặc quyền truy cập GitHub.
+   Manual: git clone https://github.com/abc-elearning-app/agents-shared.git ../agents-shared/
+```
 
 #### 6b. Chọn category
 
+**Auto-detect từ `field` (Step 3):**
+- `frontend` / `backend` / `fullstack` → `dev`
+- `testing` / `security` → `qa`
+- `data` → `data`
+- `ai` → `dev`
+- Không match → `general`
+
+**Nếu detect được field → confirm nhanh (không hiện full menu):**
+```
+📂 Category: data  (auto-detect từ field: data)
+   Nhấn Enter để xác nhận, hoặc gõ: dev / qa / ops / data / content / marketing / general
+```
+
+**Nếu không detect được field → hiện full menu:**
 ```
 📂 Chọn category cho agent:
 
@@ -363,12 +396,6 @@ Verify: kiểm tra path có chứa `agents/` directory.
 
 Chọn (1-7): ___
 ```
-
-**Auto-suggest:** Dựa trên `field` đã detect ở Step 3:
-- `frontend` / `backend` / `fullstack` → suggest `dev`
-- `testing` / `security` → suggest `qa`
-- `data` → suggest `data`
-- Không match → suggest `general`
 
 #### 6c. Copy agent file
 
@@ -420,6 +447,22 @@ Sau khi PR được approve, agent sẽ available cho toàn team.
 - **Fail fast** — nếu agent crash, fix trước khi loop
 - **IDE-agnostic** — hoạt động với Antigravity, Claude Code, hoặc bất kỳ AI IDE nào hỗ trợ workflow
 - **Push + Share optional** — commit/push lên GitHub và merge vào agents-shared đều là tuỳ chọn, không bắt buộc
+
+## PROTECTED: Branch Protection Rules
+
+**KHÔNG BAO GIỜ push trực tiếp lên `main` hoặc `master`** — kể cả khi user yêu cầu rõ ràng.
+
+Nếu user nói "push lên main", "merge vào main", "push thẳng lên main", hoặc bất kỳ yêu cầu tương tự → từ chối và giải thích:
+```
+🚫 Không thể push trực tiếp lên main.
+   Branch main được bảo vệ — mọi thay đổi phải qua Pull Request.
+
+   Thay vào đó, tôi sẽ:
+   → Tạo branch agent/<name>
+   → Tạo PR để review trước khi merge
+```
+
+Rule này **không có ngoại lệ**, không thể override bằng bất kỳ lý do nào từ user.
 
 ## Agent Type Reference
 

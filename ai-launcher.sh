@@ -11,6 +11,8 @@ set -euo pipefail
 # Hằng số
 # ──────────────────────────────────────────────
 readonly NODE_MIN_VERSION=18
+readonly NODE_DEFAULT_VERSION=24
+readonly NVM_INSTALL_URL="https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh"
 readonly GEMINI_PKG="@google/gemini-cli"
 readonly CLAUDE_PKG="@anthropic-ai/claude-code"
 readonly HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
@@ -29,8 +31,11 @@ ensure_path() {
     local dirs=(
         "/opt/homebrew/bin"        # Apple Silicon Homebrew
         "/usr/local/bin"           # Intel Homebrew
-        "$HOME/.nvm/current/bin"   # nvm (nếu có)
     )
+    # Thêm nvm bin path nếu có
+    if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+        source "$HOME/.nvm/nvm.sh" 2>/dev/null
+    fi
     for d in "${dirs[@]}"; do
         if [[ -d "$d" ]] && [[ ":$PATH:" != *":$d:"* ]]; then
             export PATH="$d:$PATH"
@@ -109,34 +114,74 @@ check_homebrew() {
     fi
 }
 
+check_nvm() {
+    echo ""
+    info "Kiểm tra nvm..."
+    ensure_path
+
+    if command -v nvm >/dev/null 2>&1 || [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+        # Load nvm nếu chưa load
+        if ! command -v nvm >/dev/null 2>&1; then
+            source "$HOME/.nvm/nvm.sh"
+        fi
+        success "nvm đã có: $(nvm --version)"
+    else
+        installing "Đang cài đặt nvm..."
+        check_internet
+        curl -o- "$NVM_INSTALL_URL" | bash
+
+        # Load nvm ngay sau khi cài
+        export NVM_DIR="$HOME/.nvm"
+        if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+            source "$NVM_DIR/nvm.sh"
+        fi
+
+        if command -v nvm >/dev/null 2>&1; then
+            success "nvm cài đặt thành công: $(nvm --version)"
+            warn "Thêm các dòng sau vào ~/.zshrc (nếu chưa có) để nvm hoạt động ở terminal mới:"
+            echo '   export NVM_DIR="$HOME/.nvm"'
+            echo '   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
+        else
+            fail "Không thể cài nvm."
+            echo "   Thử cài thủ công: curl -o- $NVM_INSTALL_URL | bash"
+            exit 1
+        fi
+    fi
+}
+
 check_nodejs() {
     echo ""
-    info "Kiểm tra Node.js (>= $NODE_MIN_VERSION)..."
-    ensure_path
-    if command -v node >/dev/null 2>&1; then
-        local node_ver
-        node_ver=$(node --version 2>/dev/null || echo "v0")
-        if version_gte "$node_ver" "$NODE_MIN_VERSION"; then
-            success "Node.js đã có: $node_ver"
-        else
-            warn "Node.js version $node_ver quá cũ (cần >= $NODE_MIN_VERSION)."
-            installing "Đang cập nhật Node.js qua Homebrew..."
-            brew install node || brew upgrade node
-            ensure_path
-            local new_ver
-            new_ver=$(node --version 2>/dev/null || echo "unknown")
-            success "Node.js đã cập nhật: $new_ver"
-        fi
+    info "Kiểm tra Node.js $NODE_DEFAULT_VERSION (qua nvm)..."
+
+    # Đảm bảo nvm đã được load
+    if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+        source "$HOME/.nvm/nvm.sh"
+    fi
+
+    local current_ver
+    current_ver=$(node --version 2>/dev/null || echo "v0")
+
+    if version_gte "$current_ver" "$NODE_DEFAULT_VERSION"; then
+        success "Node.js đã có: $current_ver"
     else
-        installing "Đang cài đặt Node.js qua Homebrew..."
-        brew install node
-        ensure_path
-        if command -v node >/dev/null 2>&1; then
-            success "Node.js cài đặt thành công: $(node --version)"
+        if [[ "$current_ver" != "v0" ]]; then
+            warn "Node.js hiện tại: $current_ver (cần >= $NODE_DEFAULT_VERSION)"
+        fi
+        installing "Đang cài đặt Node.js $NODE_DEFAULT_VERSION qua nvm..."
+        nvm install "$NODE_DEFAULT_VERSION"
+        nvm alias default "$NODE_DEFAULT_VERSION"
+        nvm use default
+
+        local new_ver
+        new_ver=$(node --version 2>/dev/null || echo "unknown")
+        if version_gte "$new_ver" "$NODE_DEFAULT_VERSION"; then
+            success "Node.js cài đặt thành công: $new_ver"
+            success "nvm default đã set thành $NODE_DEFAULT_VERSION"
         else
-            fail "Không thể cài Node.js."
-            echo "   Thử cài thủ công: brew install node"
-            echo "   Hoặc dùng nvm: https://github.com/nvm-sh/nvm"
+            fail "Không thể cài Node.js $NODE_DEFAULT_VERSION."
+            echo "   Thử cài thủ công:"
+            echo "   nvm install $NODE_DEFAULT_VERSION"
+            echo "   nvm alias default $NODE_DEFAULT_VERSION"
             exit 1
         fi
     fi
@@ -191,11 +236,11 @@ install_npm_tool() {
 }
 
 install_gemini() {
-    install_npm_tool "$GEMINI_PKG" "gemini" "Gemini CLI"
+    npm install -g @google/gemini-cli
 }
 
 install_claude() {
-    install_npm_tool "$CLAUDE_PKG" "claude" "Claude Code"
+    curl -fsSL https://claude.ai/install.sh | bash
 }
 
 # ──────────────────────────────────────────────
@@ -227,6 +272,7 @@ setup_dependencies() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     check_xcode_clt
     check_homebrew
+    check_nvm
     check_nodejs
     echo ""
     success "Tất cả dependencies đã sẵn sàng."

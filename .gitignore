@@ -26,7 +26,8 @@ Thumbs.db
 weather-reminder/
 
 # Projects workspace — entirely local on main; each project lives on its own branch
-projects/
+projects/*
+!projects/geo-blog-post-optimizer
 
 # Runtime state & secrets (NEVER commit)
 **/processed_email_ids.json

@@ -27,7 +27,6 @@ weather-reminder/
 
 # Projects workspace — entirely local on main; each project lives on its own branch
 projects/*
-!projects/geo-blog-post-optimizer
 
 # Runtime state & secrets (NEVER commit)
 **/processed_email_ids.json
@@ -44,3 +43,8 @@ projects/*
 *.egg-info/
 dist/
 build/
+# GEO optimizer — sensitive credentials and generated cache
+geo-optimizer-*.json
+client_secret_*.json
+oauth_token.pickle
+scripts/wzorg_link_cache.json

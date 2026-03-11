@@ -316,14 +316,22 @@ Fetch the listing page and extract each item's individual worksheet URL plus its
 
 Run via `Bash`:
 ```bash
-items=$(gemini -p "Fetch [URL] and extract all worksheet items from the listing page grid. For each item return a JSON object with these exact fields: title (string), page_url (string), description (string), grade_levels (array of strings), tags (array of strings).
+items=$(gemini -p "Fetch this URL: [URL]
+
+Extract ALL worksheet/coloring page cards from the listing page grid.
+For each card return a JSON object with these exact fields:
+  title        (string)           — the card title text
+  page_url     (string)           — the card link href, full absolute URL
+  description  (string)           — card description text, or empty string
+  grade_levels (array of strings) — e.g. [\"Preschool\", \"Grade 1\"]
+  tags         (array of strings) — topic tags
 
 RULES:
-- page_url must be the full absolute URL of the individual worksheet page (e.g. https://worksheetzone.org/orange-coloring-page-with-leaf-68804bbd...). Do NOT return the listing page URL itself.
-- If an item page_url is a relative path, prepend https://worksheetzone.org to make it absolute.
-- Do NOT include thumbnail_url — images are fetched separately in a later step.
+- page_url must be the full absolute URL of the individual worksheet page.
+  If it is a relative path, prepend https://worksheetzone.org to make it absolute.
+- Do NOT include thumbnail_url — images are fetched separately per child page.
 
-Return ONLY a valid JSON array of all items. No explanation, no markdown, no code block fences." --yolo 2>/dev/null)
+Return ONLY a valid JSON array. No explanation, no markdown fences." --yolo 2>/dev/null)
 echo "$items" > /tmp/gemini_items.json
 echo "$items"
 ```
@@ -448,14 +456,20 @@ Return ONLY the full image URL as a single plain string. No explanation, no mark
             ['gemini', '-p', prompt, '--yolo'],
             capture_output=True, text=True, timeout=120
         )
-        url = result.stdout.strip().split('\n')[0].strip()
-        if url.startswith('https://storage.googleapis.com/worksheetzone/'):
+        # Gemini often prepends an explanation line before the URL — scan all lines
+        url = ''
+        for line in result.stdout.strip().splitlines():
+            line = line.strip()
+            if line.startswith('https://storage.googleapis.com/worksheetzone/'):
+                url = line
+                break
+        if url:
             item['thumbnail_url'] = url
             print(f"         ✅ {url}", flush=True)
         else:
             item['thumbnail_url'] = None
             failed.append(item.get('title', page_url))
-            print(f"         ❌ Invalid URL returned: {url[:100]}", flush=True)
+            print(f"         ❌ No valid URL in response", flush=True)
     except subprocess.TimeoutExpired:
         item['thumbnail_url'] = None
         failed.append(item.get('title', page_url))

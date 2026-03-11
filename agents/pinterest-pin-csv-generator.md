@@ -69,7 +69,7 @@ fi
 | Source | Pinterest CSV column | Treatment |
 |---|---|---|
 | Generated (see optimization rules) | `Title` | Optimized — do NOT copy worksheet title verbatim |
-| Thumbnail image URL from listing | `Media URL` | Must be the actual GCS URL extracted from the page — found in `__NEXT_DATA__` JSON or URL-decoded from the `<img src>`'s `url=` parameter. Format: `https://storage.googleapis.com/worksheetzone/image/{unique-id}/{filename}-thumbnail.{ext}` where `.{ext}` must be preserved exactly as found (`.jpg` or `.png`) — never substituted or guessed |
+| Thumbnail URL from each child page (Step 2c) | `Media URL` | Fetched by visiting the individual worksheet page URL directly. Format: `https://storage.googleapis.com/worksheetzone/image/{unique-id}/{filename}-thumbnail.{ext}` — extension (`.jpg`, `.png`, `.webp`, etc.) preserved exactly as found on the child page, never guessed |
 | Last URL slug (title-cased) | `Pinterest board` | Auto-derived; user can override |
 | `""` | `Thumbnail` | Always blank — image pins |
 | Generated (see optimization rules) | `Description` | Optimized — 150–250 chars + CTA + hashtags |
@@ -310,28 +310,25 @@ else
 fi
 ```
 
-### Step 2 — Fetch and extract items via Gemini CLI
+### Step 2 — Fetch child page URLs from the listing page (Pass 1)
+
+Fetch the listing page and extract each item's individual worksheet URL plus its metadata. **Do not attempt to extract thumbnail URLs here** — that is done per child page in Step 2c.
 
 Run via `Bash`:
 ```bash
-items=$(gemini -p "Fetch [URL] and extract all worksheet items from the listing page grid. For each item return a JSON object with these exact fields: title (string), thumbnail_url (string), page_url (string), description (string), grade_levels (array of strings), tags (array of strings).
+items=$(gemini -p "Fetch [URL] and extract all worksheet items from the listing page grid. For each item return a JSON object with these exact fields: title (string), page_url (string), description (string), grade_levels (array of strings), tags (array of strings).
 
-CRITICAL RULES FOR thumbnail_url:
-- STEP A — Check __NEXT_DATA__ first (most reliable): The page contains a <script id="__NEXT_DATA__" type="application/json"> tag. Parse this JSON and extract thumbnail URLs from it (look for fields named thumbnail_url, image, src, or thumbnailUrl within the item/card data). These contain the raw GCS URLs with the correct extension.
-- STEP B — Fallback to <img> tags: Worksheetzone uses Next.js image optimization. The <img src> attribute is a Next.js proxy URL in the form /_next/image?url=ENCODED_GCS_URL&w=...&q=... — it is NOT a direct GCS URL. You MUST URL-decode the value of the url= query parameter to get the actual GCS URL.
-- The actual GCS URL format is: https://storage.googleapis.com/worksheetzone/image/{unique-id}/{filename}-thumbnail.{ext}
-- The file extension (.jpg or .png) varies per item — ALWAYS preserve it exactly as found in the source. NEVER substitute .png when the actual file is .jpg, or vice versa.
-- The unique-id is a long hex string like 6634b9766d9d16025be86505 — it is NOT derivable from the item title or slug.
-- NEVER construct, guess, or infer a thumbnail_url from the item title or page slug.
-- NEVER use worksheetzone.org/storage/... as the thumbnail domain — that is wrong.
-- If you cannot find the actual thumbnail URL for an item after trying both steps, set thumbnail_url to null. Do not fabricate a URL.
+RULES:
+- page_url must be the full absolute URL of the individual worksheet page (e.g. https://worksheetzone.org/orange-coloring-page-with-leaf-68804bbd...). Do NOT return the listing page URL itself.
+- If an item page_url is a relative path, prepend https://worksheetzone.org to make it absolute.
+- Do NOT include thumbnail_url — images are fetched separately in a later step.
 
 Return ONLY a valid JSON array of all items. No explanation, no markdown, no code block fences." --yolo 2>/dev/null)
 echo "$items" > /tmp/gemini_items.json
 echo "$items"
 ```
 
-Count items from the JSON output and report:
+Count items and report:
 ```
 ✅ Found 14 items on this page.
 ```
@@ -343,7 +340,7 @@ Found 14 items. Load more pages? (yes / no)
 
 If yes, re-run the gemini command for each subsequent page URL and merge the arrays:
 ```bash
-more=$(gemini -p "Fetch [next_page_URL] and extract worksheet items as a JSON array with the same schema as before..." --yolo 2>/dev/null)
+more=$(gemini -p "Fetch [next_page_URL] and extract worksheet items as a JSON array with fields: title, page_url, description, grade_levels, tags — same schema as before. No thumbnail_url." --yolo 2>/dev/null)
 # merge $items and $more into /tmp/gemini_items.json
 ```
 
@@ -413,7 +410,74 @@ If all items are duplicates:
 ```
 ⚠️  All 14 items from this URL were already pinned. Skipping to next URL.
 ```
-→ Skip Steps 3–5 for this URL and move to the next one.
+→ Skip Steps 2c–5 for this URL and move to the next one.
+
+### Step 2c — Fetch thumbnail URL from each child page (Pass 2)
+
+For every deduplicated item, fetch its individual worksheet page and extract the thumbnail URL directly from that page. This is the authoritative source — no guessing, no constructing from slugs.
+
+Run via `Bash`:
+```bash
+python3 << 'PYEOF'
+import json, subprocess, sys
+
+with open('/tmp/gemini_items.json') as f:
+    items = json.load(f)
+
+total = len(items)
+enriched = []
+failed = []
+
+for i, item in enumerate(items, 1):
+    page_url = item.get('page_url', '')
+    print(f"  [{i}/{total}] Fetching thumbnail from: {page_url}", flush=True)
+
+    prompt = f"""Fetch this page: {page_url}
+
+Find the main thumbnail image URL for this worksheet. Follow these steps in order:
+
+1. Check <script id="__NEXT_DATA__" type="application/json"> — parse the JSON and find the main image URL (look for fields named thumbnail_url, thumbnailUrl, image, src, or similar that point to storage.googleapis.com).
+2. If not found in __NEXT_DATA__, look at <img> tags. The src may be a Next.js proxy URL in the form /_next/image?url=ENCODED_URL&w=...&q=... — URL-decode the value of the url= parameter to get the actual image URL.
+3. The URL must be a direct link starting with https://storage.googleapis.com/worksheetzone/
+4. Preserve the file extension EXACTLY as found (.jpg, .png, .webp, or any other) — do NOT alter or guess it.
+
+Return ONLY the full image URL as a single plain string. No explanation, no markdown, no extra text."""
+
+    try:
+        result = subprocess.run(
+            ['gemini', '-p', prompt, '--yolo'],
+            capture_output=True, text=True, timeout=120
+        )
+        url = result.stdout.strip().split('\n')[0].strip()
+        if url.startswith('https://storage.googleapis.com/worksheetzone/'):
+            item['thumbnail_url'] = url
+            print(f"         ✅ {url}", flush=True)
+        else:
+            item['thumbnail_url'] = None
+            failed.append(item.get('title', page_url))
+            print(f"         ❌ Invalid URL returned: {url[:100]}", flush=True)
+    except subprocess.TimeoutExpired:
+        item['thumbnail_url'] = None
+        failed.append(item.get('title', page_url))
+        print(f"         ❌ Timeout fetching {page_url}", flush=True)
+
+    enriched.append(item)
+
+with open('/tmp/gemini_items.json', 'w') as f:
+    json.dump(enriched, f, indent=2)
+
+with_thumbs = sum(1 for x in enriched if x.get('thumbnail_url'))
+print(json.dumps({'total': total, 'with_thumbnails': with_thumbs, 'failed': failed}))
+PYEOF
+```
+
+Report after thumbnail fetching:
+```
+🖼️  Thumbnails fetched: 13/14
+   ❌ Could not find thumbnail for: "Orange with Stem Coloring Page"
+```
+
+If any items have `thumbnail_url = null`, warn the user — those rows will be skipped from the CSV during Step 4 validation (missing Media URL is a hard error). Ask the user whether to continue without those items or stop.
 
 ### Step 3 — Generate optimized metadata via Gemini CLI
 
@@ -513,9 +577,10 @@ Run these checks on every row:
 | `Title` 30–100 chars | Warn if < 30; auto-truncate if > 100 |
 | `Title` ≠ raw worksheet title | Warn — ensure it was rewritten |
 | `Media URL` not empty | Error — skip row, report |
-| `Media URL` ends in `.png`, `.jpg`, `.jpeg` | Warn — flag row |
-| `Media URL` starts with `storage.googleapis.com/worksheetzone/` | Error — URL was guessed/fabricated; re-fetch the page to get the real `<img src>` |
 | `Media URL` is `null` or empty | Error — skip row, report to user |
+| `Media URL` starts with `https://storage.googleapis.com/worksheetzone/` | ✅ Valid — this is the correct CDN domain |
+| `Media URL` does NOT start with `https://storage.googleapis.com/worksheetzone/` | Error — URL is wrong domain (e.g. worksheetzone.org/storage/... or a Next.js proxy URL); re-run Step 2c for this item |
+| `Media URL` file extension | Accept any image extension (.jpg, .png, .webp, etc.) — do NOT warn or reject based on extension alone |
 | `Pinterest board` not empty | Error — stop, ask user |
 | `Description` 150–500 chars | Warn if < 150; auto-truncate at 500 |
 | `Description` has CTA | Warn if no action verb detected |
@@ -557,7 +622,7 @@ for each row in merged results (items + metadata):
     total_rows += 1
 ```
 
-Merge `$items` (thumbnail_url, page_url from Step 2) with `$metadata` (title, description, keywords from Step 3) by index order before writing.
+Merge `$items` (thumbnail_url from Step 2c, page_url from Step 2) with `$metadata` (title, description, keywords from Step 3) by index order before writing.
 
 After writing, clean up temp files:
 ```bash

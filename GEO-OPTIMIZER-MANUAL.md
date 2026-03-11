@@ -243,7 +243,7 @@ Each optimized post is a ready-to-copy Google Doc with:
 | Error message | Cause | Fix |
 |---------------|-------|-----|
 | `oauth_token.pickle not found` | Authentication not completed | Re-run the installer |
-| `Token expired` | OAuth token older than ~1 week | See "Refreshing credentials" below |
+| `Token expired` | Refresh token revoked (rare) | Re-run the installer to re-authenticate |
 | `No client_secret*.json found` | Credentials file missing or misnamed | Re-download from Google Cloud Console, rename to `client_secret.json`, place in install folder |
 | `Gemini error` | Gemini CLI not logged in | Run `gemini` in Terminal and sign in |
 | `Claude error` | Claude CLI not authenticated | Run `claude` in Terminal and sign in |
@@ -252,23 +252,19 @@ Each optimized post is a ready-to-copy Google Doc with:
 | `Doc creator failed` | Docs/Drive API issue | Check [Google Cloud Console](https://console.cloud.google.com) — all three APIs must be enabled |
 | `403 The caller does not have permission` | Drive folder not shared with your account | Ask team lead to share "GEO Optimized Posts" folder with your Google account |
 
-### Refreshing expired credentials
+### Auto-refresh (no action needed)
 
-OAuth tokens expire after about a week. If you see a `Token expired` error, re-run the installer — it will detect the expired token and re-authenticate:
+Both the OAuth token and the link cache are refreshed automatically every time you run `python3 scripts/run_batch.py`:
+
+| What | How it works |
+|------|-------------|
+| **OAuth token** | If expired, refreshed silently using the stored refresh token — no browser, no action needed |
+| **Link cache** | If older than 7 days, rebuilt automatically before the first row is processed (~60s) |
+
+The only time manual action is needed is if the `oauth_token.pickle` file is missing entirely (first install) or if the refresh token was revoked by Google (very rare — happens if you revoke app access in your Google account settings). In either case, re-run the installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/abc-elearning-app/agent-factory/project/geo-blog-post-optimizer/install-geo-optimizer.sh | bash
-```
-
-Or delete `oauth_token.pickle` from the install folder and re-run the installer.
-
-### Rebuilding the link cache
-
-Run this whenever new content is published on worksheetzone.org:
-
-```bash
-cd ~/geo-optimizer
-python3 scripts/build_sitemap_cache.py
 ```
 
 ---

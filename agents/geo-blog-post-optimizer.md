@@ -93,7 +93,11 @@ python3 scripts/run_batch.py --limit 5 --dry-run
 ## What Each Script Does
 
 ### run_batch.py
-The only script you need to call directly. For each "optimize" row:
+The only script you need to call directly. On every run it automatically:
+- **Refreshes the OAuth token** if expired (uses stored refresh token — no browser needed)
+- **Rebuilds the sitemap cache** if older than 7 days (~60s, runs before first row)
+
+Then for each "optimize" row:
 1. Fetches blog post HTML → cleans to markdown
 2. Calls `optimize_post.py` (optimization)
 3. Calls `create_geo_doc.py` (Google Doc creation)
@@ -161,9 +165,12 @@ Every optimized post follows this structure, every time:
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `oauth_token.pickle not found` | Auth not set up | Run the First-Time Setup steps above |
-| `Token expired` | OAuth token >1 week old | Re-run the authentication step |
-| `Gemini error` | Gemini CLI not logged in | Run `gemini --version` and log in |
+| `oauth_token.pickle not found` | Auth not set up | Run the installer (see First-Time Setup) |
+| `Token expired` | Refresh token itself revoked | Re-run the installer to re-authenticate |
+| `Gemini error` | Gemini CLI not logged in | Run `gemini` and log in |
+| `Claude error` | Claude CLI not authenticated | Run `claude` and log in |
 | `Fetch failed` | Blog URL blocked or offline | Logged to Fail Reason; row skipped |
 | `wzorg_link_cache.json not found` | Cache not built | Run `python3 scripts/build_sitemap_cache.py` |
 | `Doc creator failed` | Docs/Drive API issue | Check Google Cloud Console — APIs must be enabled |
+
+> **Note:** Expired OAuth tokens and stale link caches are handled automatically on every run. Manual intervention is only needed if the token file is missing or the refresh token itself was revoked.

@@ -265,17 +265,12 @@ Reading sheet...
 🔍 Dedup registry: 0 URLs already seen
 
 ── Task 1/2  Row 2 │ https://worksheetzone.org/.../watermelon
-  [1/4] Fetching items via Gemini...
-  [1/4] ✅ 14 item(s) found
-  [2/4] 🔍 14/14 unique
-  [2c] Fetching thumbnails from 14 child page(s)...
-       ✅ [1/14] Watermelon Slices Coloring Page
-       ✅ [2/14] Delicious Watermelon Coloring Page
-       ...
-  [2c] 🖼️  14/14 thumbnails fetched
-  [3/4] Generating Pinterest metadata via Gemini...
-  [3/4] ✅ Metadata ready for 14 item(s)
-  [4/4] ✅ 14/14 rows passed validation
+  [1/3] Fetching items from listing page...
+  [1/3] ✅ 14 item(s) found, 14 with thumbnails
+  [2/3] 🔍 14/14 unique
+  [3/3] Generating Pinterest metadata via Gemini...
+  [3/3] ✅ Metadata ready for 14 item(s)
+  [✓] 14/14 rows passed validation
 
 📤 Uploading pinterest_pins_2026-03-11_part1.csv (14 pins)...
    ✅ https://drive.google.com/file/d/.../view
@@ -283,7 +278,7 @@ Reading sheet...
 ============================================================
 ```
 
-> **How thumbnail fetching works:** The tool uses a two-pass approach. Pass 1 fetches the listing page to collect individual worksheet URLs. Pass 2 visits each worksheet page directly to extract its thumbnail image URL. This ensures the correct image file and extension (`.jpg`, `.png`, `.webp`, etc.) are always used. Items where a thumbnail cannot be confirmed are safely skipped — they are never written to the CSV with a broken URL.
+> **How item and thumbnail fetching works:** The tool fetches the listing page once and extracts all worksheet items — including titles, grade levels, and thumbnail URLs — directly from the page's embedded JSON (`__NEXT_DATA__`). No child page visits are needed. Only Gemini (for metadata generation) requires an LLM call.
 
 ### Option B — Claude Code agent (interactive, with review step)
 
@@ -374,7 +369,7 @@ After the agent finishes:
 
 > **200-pin limit:** Pinterest allows a maximum of 200 pins per bulk upload. The agent enforces this automatically — larger batches are split into multiple files.
 
-> **Pinterest review time:** After uploading, Pinterest may take a few minutes to process images. If a pin shows a broken image, the `Media URL` in the CSV may be outdated — reset the sheet row to `to do` and re-run to regenerate it with the current two-pass extraction.
+> **Pinterest review time:** After uploading, Pinterest may take a few minutes to process images. If a pin shows a broken image, reset the sheet row to `to do` and re-run to regenerate the CSV with fresh thumbnail URLs.
 
 ---
 
@@ -388,10 +383,10 @@ After the agent finishes:
 | `No client_secret*.json found` | Credentials file missing or misnamed | Re-download from Google Cloud Console, rename to `client_secret.json`, move to install folder |
 | `403 The caller does not have permission` | Sheet or Drive folder not accessible | Make sure your Google account owns the sheet and Drive folder you configured |
 | `Gemini error` / `gemini: command not found` | Gemini CLI not installed or not in PATH | Run: `npm install -g @google/gemini-cli`, then `gemini` to log in |
-| `timed out after 600 seconds` | Gemini took too long on a large page | The page likely has many items. Re-run — Gemini will resume from where the sheet left off |
-| `No items found on page` | URL is a single worksheet page, not a listing | Use a category/listing URL (shows a grid of worksheets, not a single worksheet) |
-| `All items were already pinned` | Every item on that page was processed before | Add new listing page URLs to the sheet |
-| CSV has fewer pins than items on the page | Some worksheet pages timed out during thumbnail fetch (Pass 2) | Reset the sheet row to `to do` and re-run — each run retries only items not yet in the dedup registry |
+| `Gemini timed out` | Metadata generation took too long (large batch) | Re-run — the sheet row will be retried |
+| `No __NEXT_DATA__ found` | URL is not a Worksheetzone listing page | Use a category/listing URL (shows a grid of worksheets, not a single worksheet) |
+| `No worksheets found` | Listing page returned 0 items | Check that the URL is a category page with worksheets visible |
+| `All items were already pinned` | Every item on that page was processed before | Add new listing page URLs, or use `--reset-url URL` to reprocess one page |
 | `Sheet connection failed` | Sheet ID is wrong or sheet not shared | Double-check the Sheet ID in `pinterest_config.env`; make sure the sheet is owned by the authenticated Google account |
 | CSV uploads to wrong Drive folder | Wrong `PINTEREST_DRIVE_FOLDER_ID` | Edit `pinterest_config.env` and correct the folder ID |
 

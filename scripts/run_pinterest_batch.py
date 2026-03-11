@@ -52,29 +52,8 @@ COL_FAIL_REASON = 5   # F
 TODO_STATUS = "to do"
 
 # ── Gemini prompts ─────────────────────────────────────────────────────────────
-
-# Pass 1: extract child page URLs + metadata from the listing page only.
-# Thumbnail URLs are NOT fetched here — they are fetched per child page in Pass 2.
-FETCH_PROMPT = """\
-Fetch this URL: {url}
-
-Extract ALL worksheet/coloring page cards from the listing page grid.
-For each card return a JSON object with these exact fields:
-  title        (string)           — the card title text
-  page_url     (string)           — the card link href, full absolute URL
-  description  (string)           — card description text, or empty string
-  grade_levels (array of strings) — e.g. ["Preschool", "Grade 1"]
-  tags         (array of strings) — topic tags
-
-RULES:
-- page_url must be the full absolute URL of the individual worksheet page.
-  If it is a relative path, prepend https://worksheetzone.org to make it absolute.
-- Do NOT include thumbnail_url — images are fetched separately per child page.
-
-Return ONLY a valid JSON array. No explanation, no markdown fences.\
-"""
-
-# Pass 2: thumbnail URLs are extracted with a direct HTTP fetch — no Gemini needed.
+# Items are now fetched directly from the listing page __NEXT_DATA__ (no Gemini).
+# Gemini is only used for Step 3: generating Pinterest-optimized metadata.
 
 METADATA_PROMPT = """\
 You are a Pinterest copy specialist. Generate optimized Pinterest metadata for each item below.
@@ -229,52 +208,59 @@ def parse_json(raw: str) -> list:
     return json.loads(text)
 
 
-# ── Step 2: Fetch items (Pass 1 — listing page only, no thumbnails) ───────────
+# ── Step 1: Fetch items from listing page via __NEXT_DATA__ ───────────────────
 def fetch_items(url: str) -> list:
-    raw   = gemini_run(FETCH_PROMPT.format(url=url), timeout=600)
-    items = parse_json(raw)
-    if not isinstance(items, list):
-        raise ValueError(f"Expected a JSON array from Gemini, got {type(items).__name__}")
-    return items
+    """Extract all worksheet items directly from the listing page __NEXT_DATA__ JSON.
 
-
-# ── Step 2c: Fetch thumbnail from each child page (Pass 2) ────────────────────
-def fetch_thumbnail(page_url: str):
-    """Extract thumbnail URL directly from the child page HTML — no Gemini needed.
-
-    Reads __NEXT_DATA__ JSON first (most reliable), then falls back to a
-    regex scan of the raw HTML. Preserves the file extension exactly as found.
-    Completes in under 1 second — no LLM timeout risk.
+    No Gemini needed — Worksheetzone embeds the full worksheet array (including
+    thumbnail URLs, grades, and slugs) in the page's __NEXT_DATA__ script tag.
+    One HTTP request, no LLM timeout risk.
     """
+    req  = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; Bot/1.0)"})
+    html = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", errors="ignore")
+
+    m = re.search(
+        r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+        html, re.DOTALL
+    )
+    if not m:
+        raise ValueError(
+            "No __NEXT_DATA__ found on listing page. "
+            "Make sure the URL is a listing/category page, not a single worksheet."
+        )
+
+    data = json.loads(m.group(1))
     try:
-        req = urllib.request.Request(
-            page_url, headers={"User-Agent": "Mozilla/5.0 (compatible; Bot/1.0)"}
+        worksheets = (
+            data["props"]["pageProps"]["initialState"]
+            ["homeV2State"]["currentPageData"]["worksheets"]
         )
-        html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8", errors="ignore")
-
-        # Step A: parse __NEXT_DATA__ JSON — contains raw GCS URLs with correct extension
-        m = re.search(
-            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
-            html, re.DOTALL
+    except KeyError:
+        raise ValueError(
+            "Unexpected page structure — could not find worksheets list in __NEXT_DATA__. "
+            "Make sure the URL is a Worksheetzone listing/category page."
         )
-        if m:
-            txt = json.dumps(json.loads(m.group(1)))
-            urls = re.findall(
-                r'https://storage\.googleapis\.com/worksheetzone/image/[^"]+thumbnail\.[a-z]+',
-                txt
-            )
-            if urls:
-                return urls[0]
 
-        # Step B: fallback — scan raw HTML for any GCS thumbnail URL
-        urls = re.findall(
-            r'https://storage\.googleapis\.com/worksheetzone/image/[^"&\s]+thumbnail\.[a-z]+',
-            html
-        )
-        return urls[0] if urls else None
+    if not isinstance(worksheets, list) or not worksheets:
+        raise ValueError("No worksheets found on the listing page.")
 
-    except Exception:
-        return None
+    items = []
+    for w in worksheets:
+        slug     = w.get("slug", "")
+        page_url = f"https://worksheetzone.org/{slug}" if slug else ""
+        grades   = (w.get("moreInfo") or {}).get("grades", [])
+        desc     = ((w.get("seoInfo") or {}).get("description") or "").strip()
+        tags     = [t.get("name", "") for t in (w.get("tags") or []) if t.get("name")]
+        items.append({
+            "title":         w.get("title", "").strip(),
+            "page_url":      page_url,
+            "thumbnail_url": w.get("thumbnail", "").strip(),
+            "description":   desc,
+            "grade_levels":  grades,
+            "tags":          tags,
+        })
+
+    return items
 
 
 # ── Step 2b: Deduplicate ───────────────────────────────────────────────────────
@@ -450,47 +436,33 @@ def process_task(task: dict, csv_writer: "CsvWriter | None",
     }
 
     try:
-        # Step 2 — fetch
-        print(f"  [1/4] Fetching items via Gemini...")
+        # Step 1 — fetch items + thumbnails directly from listing page __NEXT_DATA__
+        print(f"  [1/3] Fetching items from listing page...")
         items = fetch_items(source_url)
-        print(f"  [1/4] ✅ {len(items)} item(s) found")
+        thumb_count = sum(1 for it in items if it.get("thumbnail_url"))
+        print(f"  [1/3] ✅ {len(items)} item(s) found, {thumb_count} with thumbnails")
 
-        # Step 2b — dedup
+        # Step 2 — dedup
         clean, dupes = dedup(items, seen, source_url)
         if dupes:
-            print(f"  [2/4] 🔍 {len(clean)} unique, {len(dupes)} duplicate(s) skipped")
+            print(f"  [2/3] 🔍 {len(clean)} unique, {len(dupes)} duplicate(s) skipped")
         else:
-            print(f"  [2/4] 🔍 {len(clean)}/{len(items)} unique")
+            print(f"  [2/3] 🔍 {len(clean)}/{len(items)} unique")
 
         if not clean:
             print(f"  ℹ️  All items already seen — skipping task")
             result["status"] = "skipped"
             return result
 
-        # Step 2c — fetch thumbnail from each child page (Pass 2)
-        print(f"  [2c] Fetching thumbnails from {len(clean)} child page(s)...")
-        thumb_ok, thumb_fail = 0, 0
-        for j, item in enumerate(clean, 1):
-            thumb = fetch_thumbnail(item.get("page_url", ""))
-            item["thumbnail_url"] = thumb
-            if thumb:
-                thumb_ok += 1
-                print(f"       ✅ [{j}/{len(clean)}] {item.get('title', '')[:55]}")
-            else:
-                thumb_fail += 1
-                print(f"       ❌ [{j}/{len(clean)}] no thumbnail: {item.get('title', '')[:55]}")
-        print(f"  [2c] 🖼️  {thumb_ok}/{len(clean)} thumbnails fetched"
-              + (f" ({thumb_fail} failed)" if thumb_fail else ""))
-
-        # Step 3 — generate metadata
-        print(f"  [3/4] Generating Pinterest metadata via Gemini...")
+        # Step 3 — generate Pinterest metadata via Gemini
+        print(f"  [3/3] Generating Pinterest metadata via Gemini...")
         metadata = generate_metadata(clean)
-        print(f"  [3/4] ✅ Metadata ready for {len(metadata)} item(s)")
+        print(f"  [3/3] ✅ Metadata ready for {len(metadata)} item(s)")
 
         # Step 4 — validate
         rows, errors, warns = validate(clean, metadata, board)
         suffix = f"({errors} error(s), {warns} warning(s))" if (errors or warns) else ""
-        print(f"  [4/4] ✅ {len(rows)}/{len(clean)} rows passed validation {suffix}".rstrip())
+        print(f"  [✓] {len(rows)}/{len(clean)} rows passed validation {suffix}".rstrip())
 
         if not rows:
             raise RuntimeError("No valid rows remained after validation")

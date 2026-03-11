@@ -49,27 +49,45 @@ COL_FAIL_REASON = 5   # F
 TODO_STATUS = "to do"
 
 # ── Gemini prompts ─────────────────────────────────────────────────────────────
+
+# Pass 1: extract child page URLs + metadata from the listing page only.
+# Thumbnail URLs are NOT fetched here — they are fetched per child page in Pass 2.
 FETCH_PROMPT = """\
 Fetch this URL: {url}
 
 Extract ALL worksheet/coloring page cards from the listing page grid.
 For each card return a JSON object with these exact fields:
   title        (string)           — the card title text
-  thumbnail_url (string or null)  — the actual <img src> URL
   page_url     (string)           — the card link href, full absolute URL
   description  (string)           — card description text, or empty string
   grade_levels (array of strings) — e.g. ["Preschool", "Grade 1"]
   tags         (array of strings) — topic tags
 
-CRITICAL RULES FOR thumbnail_url:
-- Read the actual src attribute of each card's <img> tag.
-- Correct format: https://storage.googleapis.com/worksheetzone/image/{{hex-id}}/{{filename}}-thumbnail.png
-- The hex-id (e.g. 6634b9766d9d16025be86505) is embedded in the HTML — do NOT derive it from the slug.
-- If you cannot find the actual <img src>, set thumbnail_url to null.
-- NEVER use worksheetzone.org/storage/... — that domain is wrong.
-- NEVER construct or guess a thumbnail_url from the page slug.
+RULES:
+- page_url must be the full absolute URL of the individual worksheet page.
+  If it is a relative path, prepend https://worksheetzone.org to make it absolute.
+- Do NOT include thumbnail_url — images are fetched separately per child page.
 
 Return ONLY a valid JSON array. No explanation, no markdown fences.\
+"""
+
+# Pass 2: fetch the thumbnail URL from an individual worksheet page.
+THUMBNAIL_PROMPT = """\
+Fetch this page: {page_url}
+
+Find the main thumbnail image URL for this worksheet. Follow these steps in order:
+
+1. Check <script id="__NEXT_DATA__" type="application/json"> — parse the JSON and find the \
+main image URL (look for fields named thumbnail_url, thumbnailUrl, image, src, or similar \
+that point to storage.googleapis.com).
+2. If not found in __NEXT_DATA__, look at <img> tags. The src may be a Next.js proxy URL \
+in the form /_next/image?url=ENCODED_URL&w=...&q=... — URL-decode the value of the url= \
+parameter to get the actual image URL.
+3. The URL must be a direct link starting with https://storage.googleapis.com/worksheetzone/
+4. Preserve the file extension EXACTLY as found (.jpg, .png, .webp, or any other) — \
+do NOT alter or guess it.
+
+Return ONLY the full image URL as a single plain string. No explanation, no markdown, no extra text.\
 """
 
 METADATA_PROMPT = """\
@@ -111,8 +129,12 @@ Detect from page_url, title, and tags:
 - Natural conversational tone, no keyword stuffing, no repetition
 
 ## Keywords rules
-- Strip # from description hashtags, append grade levels
-- Comma-separated, no spaces within a keyword
+- Strip # from description hashtags, append normalized grade codes
+- Normalize grade levels: Preschool → Pre, Kindergarten/KG → KG, Grade 1/1st → 1st, \
+Grade 2/2nd → 2nd, Grade 3/3rd → 3rd, Grade 4/4th → 4th, Grade 5/5th → 5th, Grade 6+ → 6th
+- If worksheet spans multiple grades, include only the lowest and highest code as range \
+endpoints (e.g. Pre,5th — NOT Pre,KG,1st,2nd,3rd,4th,5th)
+- No duplicate keywords. Comma-separated, no spaces after commas. Hashtag-derived keywords lowercase.
 
 ## Input items
 {items_json}
@@ -212,13 +234,28 @@ def parse_json(raw: str) -> list:
     return json.loads(text)
 
 
-# ── Step 2: Fetch items ────────────────────────────────────────────────────────
+# ── Step 2: Fetch items (Pass 1 — listing page only, no thumbnails) ───────────
 def fetch_items(url: str) -> list:
     raw   = gemini_run(FETCH_PROMPT.format(url=url), timeout=600)
     items = parse_json(raw)
     if not isinstance(items, list):
         raise ValueError(f"Expected a JSON array from Gemini, got {type(items).__name__}")
     return items
+
+
+# ── Step 2c: Fetch thumbnail from each child page (Pass 2) ────────────────────
+def fetch_thumbnail(page_url: str):
+    """Visit the individual worksheet page and extract its thumbnail URL directly."""
+    try:
+        raw = gemini_run(THUMBNAIL_PROMPT.format(page_url=page_url), timeout=120)
+        # Gemini may prepend an explanation line — scan all lines for the actual URL
+        for line in raw.strip().splitlines():
+            line = line.strip()
+            if line.startswith("https://storage.googleapis.com/worksheetzone/"):
+                return line
+        return None
+    except Exception:
+        return None
 
 
 # ── Step 2b: Deduplicate ───────────────────────────────────────────────────────
@@ -269,10 +306,8 @@ def validate(items: list, metadata: list, board: str) -> tuple:
 
         if not media_url or media_url.lower() == "null":
             print(f"    ⚠️  Row {i}: no thumbnail_url — skipped: {title[:50]}"); errors += 1; continue
-        if "worksheetzone.org/storage" in media_url:
-            print(f"    ❌ Row {i}: fabricated thumbnail domain — skipped"); errors += 1; continue
-        if not media_url.lower().endswith((".png", ".jpg", ".jpeg")):
-            print(f"    ⚠️  Row {i}: thumbnail URL missing image extension"); warns += 1
+        if not media_url.startswith("https://storage.googleapis.com/worksheetzone/"):
+            print(f"    ❌ Row {i}: wrong thumbnail domain — skipped: {media_url[:80]}"); errors += 1; continue
 
         if len(description) < 150:
             print(f"    ⚠️  Row {i}: description {len(description)} chars (< 150)"); warns += 1
@@ -411,6 +446,21 @@ def process_task(task: dict, csv_writer: "CsvWriter | None",
             print(f"  ℹ️  All items already seen — skipping task")
             result["status"] = "skipped"
             return result
+
+        # Step 2c — fetch thumbnail from each child page (Pass 2)
+        print(f"  [2c] Fetching thumbnails from {len(clean)} child page(s)...")
+        thumb_ok, thumb_fail = 0, 0
+        for j, item in enumerate(clean, 1):
+            thumb = fetch_thumbnail(item.get("page_url", ""))
+            item["thumbnail_url"] = thumb
+            if thumb:
+                thumb_ok += 1
+                print(f"       ✅ [{j}/{len(clean)}] {item.get('title', '')[:55]}")
+            else:
+                thumb_fail += 1
+                print(f"       ❌ [{j}/{len(clean)}] no thumbnail: {item.get('title', '')[:55]}")
+        print(f"  [2c] 🖼️  {thumb_ok}/{len(clean)} thumbnails fetched"
+              + (f" ({thumb_fail} failed)" if thumb_fail else ""))
 
         # Step 3 — generate metadata
         print(f"  [3/4] Generating Pinterest metadata via Gemini...")

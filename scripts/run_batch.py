@@ -20,6 +20,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import pickle
 import re
@@ -28,7 +29,7 @@ import sys
 import time
 import urllib.request
 import warnings
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
@@ -36,12 +37,14 @@ warnings.filterwarnings("ignore")
 from googleapiclient.discovery import build
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SCRIPTS_DIR   = Path(__file__).parent
-TOKEN_FILE    = SCRIPTS_DIR.parent / "oauth_token.pickle"
-SHEET_ID      = "1BhPNndHkZNf4xwJz1_AQUQcWo9awjt41swnVlrefj6c"
-FOLDER_ID     = "16kPgjFPeahDJ_Acy00l7KLVGzR6VxkHZ"
-TMP_DIR       = Path("/tmp/geo_batch")
-DELAY_SECONDS = 5        # polite delay between rows to avoid rate limits
+SCRIPTS_DIR       = Path(__file__).parent
+TOKEN_FILE        = SCRIPTS_DIR.parent / "oauth_token.pickle"
+CACHE_FILE        = SCRIPTS_DIR / "wzorg_link_cache.json"
+SHEET_ID          = "1BhPNndHkZNf4xwJz1_AQUQcWo9awjt41swnVlrefj6c"
+FOLDER_ID         = "16kPgjFPeahDJ_Acy00l7KLVGzR6VxkHZ"
+TMP_DIR           = Path("/tmp/geo_batch")
+DELAY_SECONDS     = 5    # polite delay between rows to avoid rate limits
+CACHE_MAX_AGE_DAYS = 7   # rebuild sitemap cache if older than this
 
 # Column indices (0-based)
 COL_URL            = 0
@@ -56,8 +59,50 @@ COL_POST_TITLE     = 6
 # ── Google API helpers ────────────────────────────────────────────────────────
 
 def load_creds():
+    """Load OAuth credentials, auto-refreshing if expired (no browser needed)."""
+    if not TOKEN_FILE.exists():
+        raise FileNotFoundError(
+            f"oauth_token.pickle not found.\n"
+            f"Run the installer to authenticate:\n"
+            f"  curl -fsSL https://raw.githubusercontent.com/abc-elearning-app/"
+            f"agent-factory/project/geo-blog-post-optimizer/install-geo-optimizer.sh | bash"
+        )
     with open(TOKEN_FILE, "rb") as f:
-        return pickle.load(f)
+        creds = pickle.load(f)
+
+    if creds.expired and creds.refresh_token:
+        from google.auth.transport.requests import Request
+        print("🔄 OAuth token expired — refreshing automatically ...")
+        creds.refresh(Request())
+        with open(TOKEN_FILE, "wb") as f:
+            pickle.dump(creds, f)
+        print("✅ OAuth token refreshed")
+
+    return creds
+
+
+def maybe_refresh_cache():
+    """Rebuild the sitemap cache if it is older than CACHE_MAX_AGE_DAYS."""
+    if not CACHE_FILE.exists():
+        return  # missing cache is handled by find_internal_links at runtime
+
+    try:
+        data = json.loads(CACHE_FILE.read_text())
+        last_updated = data.get("last_updated", "")
+        if not last_updated:
+            return
+        age = (date.today() - date.fromisoformat(last_updated)).days
+        if age >= CACHE_MAX_AGE_DAYS:
+            print(f"🔄 Link cache is {age} days old — rebuilding (this takes ~60s) ...")
+            subprocess.run(
+                [sys.executable, str(SCRIPTS_DIR / "build_sitemap_cache.py")],
+                check=True
+            )
+            print("✅ Link cache rebuilt")
+        else:
+            print(f"✅ Link cache is up to date ({age} day{'s' if age != 1 else ''} old)")
+    except Exception as e:
+        print(f"⚠️  Could not check cache age: {e} — continuing with existing cache")
 
 def get_sheet_rows(sheets_svc) -> list[tuple[int, list]]:
     """Return list of (sheet_row_number, row_data) for all rows with status='optimize'."""
@@ -262,11 +307,14 @@ def main():
 
     print("=" * 60)
     print("GEO Batch Optimizer")
+    print(f"  Cache max age : {CACHE_MAX_AGE_DAYS} days (auto-rebuild if older)")
     print(f"  Limit     : {args.limit} rows")
     if args.start_row: print(f"  Start row : {args.start_row}")
     if args.end_row:   print(f"  End row   : {args.end_row}")
     if args.dry_run:   print(f"  Mode      : DRY RUN (no writes)")
     print("=" * 60)
+
+    maybe_refresh_cache()
 
     creds      = load_creds()
     sheets_svc = build("sheets", "v4", credentials=creds)

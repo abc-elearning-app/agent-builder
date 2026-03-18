@@ -183,44 +183,53 @@ def detect_article_type(headline: str) -> str:
 def extract_faq_pairs(html: str) -> list:
     """
     Extract Q&A pairs from the FAQ section.
-    Looks for an h2/h3 heading containing 'FAQ' or 'Frequently Asked Questions',
-    then collects subsequent h3/h4 + p pairs as questions and answers.
+
+    WordPress wraps heading text in inline tags like <b> and <span>, so the
+    FAQ heading appears as e.g. <h2><b>Frequently Asked Questions (FAQ)</b></h2>.
+    We iterate over all h2/h3 tags, strip their inner HTML, then match on plain
+    text — this is robust to any inline tag nesting inside headings.
     """
     pairs = []
 
-    faq_start = re.search(
-        r'<h[23][^>]*>[^<]*(?:frequently\s+asked\s+questions|faq)[^<]*</h[23]>',
-        html, re.IGNORECASE
-    )
-    if not faq_start:
+    # Step 1: locate the FAQ heading by stripping inner HTML from each h2/h3
+    faq_start_pos = None
+    for m in re.finditer(r'<h[23][^>]*>(.*?)</h[23]>', html, re.DOTALL | re.IGNORECASE):
+        heading_text = re.sub(r'<[^>]+>', '', m.group(1)).strip().lower()
+        if 'frequently asked' in heading_text or re.match(r'^faq[\s\b(]', heading_text):
+            faq_start_pos = m.end()
+            break
+
+    if faq_start_pos is None:
         return pairs
 
-    faq_html = html[faq_start.end():]
+    faq_html = html[faq_start_pos:]
 
-    # Split into chunks at each h3/h4 heading
+    # Step 2: split into chunks at each h3/h4 (the individual questions)
+    # .*? with DOTALL handles <b>/<span> tags inside the heading
     chunks = re.split(r'(<h[34][^>]*>.*?</h[34]>)', faq_html, flags=re.DOTALL | re.IGNORECASE)
 
-    i = 1  # skip the first chunk (text before first heading)
+    i = 1  # index 0 is text before the first question heading
     while i < len(chunks) - 1:
         heading_raw = chunks[i]
         body_raw    = chunks[i + 1]
 
-        question = re.sub(r"<[^>]+>", "", heading_raw).strip()
-        question = re.sub(r"^(Q:|Question:)\s*", "", question, flags=re.IGNORECASE).strip()
+        # Strip all inner HTML tags to get the plain question text
+        question = re.sub(r'<[^>]+>', '', heading_raw).strip()
+        question = re.sub(r'^(Q:|Question:)\s*', '', question, flags=re.IGNORECASE).strip()
 
-        # Stop if we've left the FAQ section (hit a major heading)
-        if re.search(r"^(references|conclusion|summary|related|see also)", question, re.IGNORECASE):
+        # Stop if we've drifted out of the FAQ section
+        if re.search(r'^(references|conclusion|summary|related|see also)', question, re.IGNORECASE):
             break
 
-        # First <p> in the body is the answer
-        p_match = re.search(r"<p[^>]*>(.*?)</p>", body_raw, re.DOTALL | re.IGNORECASE)
+        # Answer: first <p> block after the heading (strip inner tags like <span>)
+        p_match = re.search(r'<p[^>]*>(.*?)</p>', body_raw, re.DOTALL | re.IGNORECASE)
         if p_match:
-            answer = re.sub(r"<[^>]+>", "", p_match.group(1)).strip()
-            answer = re.sub(r"\s+", " ", answer)
+            answer = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
+            answer = re.sub(r'\s+', ' ', answer)
             if question and answer and len(answer) > 10:
                 pairs.append({"question": question, "answer": answer[:600]})
 
-        i += 2  # move to next heading chunk
+        i += 2
 
     return pairs[:6]
 

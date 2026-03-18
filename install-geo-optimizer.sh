@@ -12,10 +12,12 @@
 set -euo pipefail
 
 # ── Re-exec if being piped (curl | bash loses interactivity) ─────────────────
+# When piped, cat consumes all stdin leaving it as a dead pipe.
+# </dev/tty reconnects stdin to the real terminal so read/pause work correctly.
 if [ ! -t 0 ]; then
     SELF=$(mktemp /tmp/install-geo-optimizer-XXXX.sh)
     cat > "$SELF"
-    exec bash "$SELF" "$@"
+    exec bash "$SELF" "$@" </dev/tty
 fi
 
 # ── Colors ────────────────────────────────────────────────────────────────────

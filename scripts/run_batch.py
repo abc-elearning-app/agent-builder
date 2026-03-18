@@ -54,6 +54,8 @@ COL_OPTIMIZED_DOC  = 3
 COL_FAIL_REASON    = 4
 COL_PROCESSED_DATE = 5
 COL_POST_TITLE     = 6
+COL_SCHEMA_STATUS  = 7   # H — trigger: "Generate Schema"
+COL_SCHEMA_FILE    = 8   # I — output: schema doc URL
 
 
 # ── Google API helpers ────────────────────────────────────────────────────────
@@ -105,9 +107,9 @@ def maybe_refresh_cache():
         print(f"⚠️  Could not check cache age: {e} — continuing with existing cache")
 
 def get_sheet_rows(sheets_svc) -> list[tuple[int, list]]:
-    """Return list of (sheet_row_number, row_data) for all rows with status='optimize'."""
+    """Return (sheet_row_number, row_data) for all rows with Status='optimize'."""
     result = sheets_svc.spreadsheets().values().get(
-        spreadsheetId=SHEET_ID, range="A:G"
+        spreadsheetId=SHEET_ID, range="A:I"
     ).execute()
     rows = result.get("values", [])
     out = []
@@ -116,6 +118,21 @@ def get_sheet_rows(sheets_svc) -> list[tuple[int, list]]:
         if status == "optimize":
             out.append((i, row))
     return out
+
+
+def get_schema_rows(sheets_svc) -> list[tuple[int, list]]:
+    """Return (sheet_row_number, row_data) for all rows with Schema Status='generate schema'."""
+    result = sheets_svc.spreadsheets().values().get(
+        spreadsheetId=SHEET_ID, range="A:I"
+    ).execute()
+    rows = result.get("values", [])
+    out = []
+    for i, row in enumerate(rows[1:], start=2):
+        schema_status = row[COL_SCHEMA_STATUS].strip().lower() if len(row) > COL_SCHEMA_STATUS else ""
+        if schema_status == "generate schema":
+            out.append((i, row))
+    return out
+
 
 def update_sheet_row(sheets_svc, row_num: int, doc_url: str):
     sheets_svc.spreadsheets().values().batchUpdate(
@@ -134,6 +151,26 @@ def fail_sheet_row(sheets_svc, row_num: int, reason: str):
             {"range": f"B{row_num}", "values": [["Failed ❌"]]},
             {"range": f"E{row_num}", "values": [[reason[:500]]]},
             {"range": f"F{row_num}", "values": [[str(date.today())]]},
+        ]}
+    ).execute()
+
+
+def update_schema_row(sheets_svc, row_num: int, doc_url: str):
+    sheets_svc.spreadsheets().values().batchUpdate(
+        spreadsheetId=SHEET_ID,
+        body={"valueInputOption": "RAW", "data": [
+            {"range": f"H{row_num}", "values": [["Done ✅"]]},
+            {"range": f"I{row_num}", "values": [[doc_url]]},
+        ]}
+    ).execute()
+
+
+def fail_schema_row(sheets_svc, row_num: int, reason: str):
+    sheets_svc.spreadsheets().values().batchUpdate(
+        spreadsheetId=SHEET_ID,
+        body={"valueInputOption": "RAW", "data": [
+            {"range": f"H{row_num}", "values": [["Failed ❌"]]},
+            {"range": f"E{row_num}", "values": [[reason[:500]]]},
         ]}
     ).execute()
 
@@ -226,6 +263,65 @@ def run_doc_creator(input_path: Path, title: str) -> str:
     return doc_url
 
 
+# ── Schema runner ─────────────────────────────────────────────────────────────
+
+def run_schema_generator(url: str, title: str, author: str) -> str:
+    result = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "create_schema_doc.py"),
+         "--url",       url,
+         "--title",     title,
+         "--author",    author,
+         "--folder-id", FOLDER_ID],
+        capture_output=True, text=True, timeout=120
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Schema generator failed:\n{result.stderr[-500:]}")
+    if result.stderr:
+        for line in result.stderr.strip().splitlines():
+            print(f"    {line}")
+    doc_url = result.stdout.strip()
+    if not doc_url.startswith("https://"):
+        raise RuntimeError(f"Unexpected schema generator output: {doc_url[:200]}")
+    return doc_url
+
+
+def process_schema_row(row_num: int, row: list, sheets_svc, dry_run: bool) -> bool:
+    url    = row[COL_URL].strip()        if len(row) > COL_URL        else ""
+    title  = row[COL_POST_TITLE].strip() if len(row) > COL_POST_TITLE else ""
+    author = row[COL_WRITER].strip()     if len(row) > COL_WRITER     else ""
+
+    if not url:
+        print(f"  ⚠️  Skipped — empty URL")
+        return False
+
+    if not title:
+        title = url.rstrip("/").split("/")[-1].replace("-", " ").title()
+
+    try:
+        print(f"  [1/2] Generating schema for {url}")
+        doc_url = run_schema_generator(url, title, author)
+        print(f"  [1/2] ✅ {doc_url}")
+
+        if dry_run:
+            print(f"  [2/2] ⏭️  Dry run — skipping sheet update")
+            return True
+
+        print(f"  [2/2] Updating sheet row {row_num} ...")
+        update_schema_row(sheets_svc, row_num, doc_url)
+        print(f"  [2/2] ✅ Sheet updated")
+        return True
+
+    except Exception as e:
+        err = str(e)
+        print(f"  ❌ FAILED: {err[:200]}")
+        if not dry_run:
+            try:
+                fail_schema_row(sheets_svc, row_num, err)
+            except Exception as sheet_err:
+                print(f"  ⚠️  Could not update sheet: {sheet_err}")
+        return False
+
+
 # ── Row processor ─────────────────────────────────────────────────────────────
 
 def process_row(row_num: int, row: list, sheets_svc, dry_run: bool) -> bool:
@@ -300,30 +396,71 @@ def main():
     parser.add_argument("--end-row",   type=int, default=None,
                         help="Only process rows <= this sheet row number")
     parser.add_argument("--dry-run",   action="store_true",
-                        help="Optimize but skip doc creation and sheet updates")
+                        help="Run logic but skip doc creation and sheet updates")
+    parser.add_argument("--schema",    action="store_true",
+                        help="Schema mode: process rows with Schema Status='Generate Schema'")
     args = parser.parse_args()
 
     TMP_DIR.mkdir(parents=True, exist_ok=True)
 
+    mode_label = "Schema Generator" if args.schema else "GEO Optimizer"
     print("=" * 60)
-    print("GEO Batch Optimizer")
-    print(f"  Cache max age : {CACHE_MAX_AGE_DAYS} days (auto-rebuild if older)")
+    print(f"{mode_label}")
+    if not args.schema:
+        print(f"  Cache max age : {CACHE_MAX_AGE_DAYS} days (auto-rebuild if older)")
     print(f"  Limit     : {args.limit} rows")
     if args.start_row: print(f"  Start row : {args.start_row}")
     if args.end_row:   print(f"  End row   : {args.end_row}")
     if args.dry_run:   print(f"  Mode      : DRY RUN (no writes)")
     print("=" * 60)
 
-    maybe_refresh_cache()
+    if not args.schema:
+        maybe_refresh_cache()
 
     creds      = load_creds()
     sheets_svc = build("sheets", "v4", credentials=creds)
 
+    # ── Schema mode ───────────────────────────────────────────────────────────
+    if args.schema:
+        print("Reading sheet for schema rows ...")
+        all_rows = get_schema_rows(sheets_svc)
+        print(f"Found {len(all_rows)} rows with Schema Status='Generate Schema'")
+
+        if args.start_row or args.end_row:
+            all_rows = [
+                (r, row) for r, row in all_rows
+                if (args.start_row is None or r >= args.start_row) and
+                   (args.end_row   is None or r <= args.end_row)
+            ]
+            print(f"After range filter: {len(all_rows)} rows")
+
+        batch = all_rows[:args.limit]
+        print(f"Processing {len(batch)} rows this run\n")
+
+        succeeded = failed = 0
+        for i, (row_num, row) in enumerate(batch, start=1):
+            url = row[COL_URL] if len(row) > COL_URL else "?"
+            print(f"── Row {row_num}  [{i}/{len(batch)}]  {url}")
+            ok = process_schema_row(row_num, row, sheets_svc, dry_run=args.dry_run)
+            if ok: succeeded += 1
+            else:  failed    += 1
+            if i < len(batch):
+                print(f"  ⏳ Waiting {DELAY_SECONDS}s ...\n")
+                time.sleep(DELAY_SECONDS)
+
+        print("\n" + "=" * 60)
+        print("Schema batch complete")
+        print(f"  ✅ Succeeded : {succeeded}")
+        print(f"  ❌ Failed    : {failed}")
+        print(f"  📊 Sheet     : https://docs.google.com/spreadsheets/d/{SHEET_ID}")
+        print("=" * 60)
+        return
+
+    # ── Optimize mode (existing) ──────────────────────────────────────────────
     print("Reading sheet ...")
     all_rows = get_sheet_rows(sheets_svc)
     print(f"Found {len(all_rows)} rows with status='optimize'")
 
-    # Apply row range filter
     if args.start_row or args.end_row:
         all_rows = [
             (r, row) for r, row in all_rows
@@ -332,7 +469,6 @@ def main():
         ]
         print(f"After range filter: {len(all_rows)} rows")
 
-    # Apply limit
     batch = all_rows[:args.limit]
     print(f"Processing {len(batch)} rows this run\n")
 

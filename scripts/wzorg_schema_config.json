@@ -1,0 +1,123 @@
+{
+  "_comment": "Static schema.org config for worksheetzone.org. Used by create_schema_doc.py to build JSON-LD without re-fetching the site. Update manually when org/author info changes.",
+
+  "organization": {
+    "@type": "Organization",
+    "@id": "https://worksheetzone.org#organization",
+    "name": "Worksheetzone",
+    "url": "https://worksheetzone.org",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://cdn.worksheetzone.org/images-web/worksheetzone-logo.webp"
+    },
+    "sameAs": [
+      "https://www.facebook.com/worksheetzone",
+      "https://www.pinterest.com/worksheetzone",
+      "https://www.youtube.com/@Worksheetzone_Education",
+      "https://www.tiktok.com/@worksheetzone.org",
+      "https://www.instagram.com/worksheetzone/"
+    ]
+  },
+
+  "website": {
+    "@type": "WebSite",
+    "@id": "https://worksheetzone.org#website",
+    "name": "Worksheetzone",
+    "url": "https://worksheetzone.org",
+    "publisher": { "@id": "https://worksheetzone.org#organization" }
+  },
+
+  "authors": {
+    "Johnny Tuan": {
+      "@type": "Person",
+      "@id": "https://worksheetzone.org#author/johnny-tuan",
+      "name": "Johnny Tuan",
+      "url": "https://worksheetzone.org/author/nguyen-thanh",
+      "image": "https://storage.googleapis.com/worksheetzone/images/3434-1770089623828.jpg",
+      "jobTitle": "Academic Specialist",
+      "sameAs": [
+        "https://www.facebook.com/pDorzi/",
+        "https://x.com/johnny_tuan_2k",
+        "https://www.pinterest.com/prodator655/_profile/",
+        "https://www.youtube.com/@JohnnyTuan2k",
+        "https://www.reddit.com/user/Foreign_Pride_6382/",
+        "https://www.tumblr.com/blog/johnnytuan2k",
+        "https://www.twitch.tv/tuanjohnny"
+      ]
+    },
+    "Tracy Pham": {
+      "@type": "Person",
+      "@id": "https://worksheetzone.org#author/tracy-pham",
+      "name": "Tracy Pham",
+      "url": "https://worksheetzone.org/author/trampham",
+      "image": "https://storage.googleapis.com/worksheetzone/images/4e87930e9f0607db9ed136e568ba441e-1756436155026.jpg",
+      "jobTitle": "Academic Quality Assurance Specialist",
+      "sameAs": [
+        "https://www.facebook.com/p.n.traam/",
+        "https://www.pinterest.com/tracypham1204/",
+        "https://www.linkedin.com/in/tracy-pham-02a583340/",
+        "https://www.tumblr.com/tracypham0",
+        "https://www.twitch.tv/tracypham00"
+      ]
+    },
+    "Mia Blythe": {
+      "@type": "Person",
+      "@id": "https://worksheetzone.org#author/mia-blythe",
+      "name": "Mia Blythe",
+      "url": "https://worksheetzone.org/author/huyenchang",
+      "image": "https://lh3.googleusercontent.com/a/ACg8ocJVs19t5k1v0ExaL96OO8g3X0VQGLjTFpSNy2CcDO7NGyWz=s96-c",
+      "jobTitle": "Academic Specialist",
+      "sameAs": [
+        "https://x.com/miablythe92",
+        "https://www.pinterest.com/chanchan2242/_profile/",
+        "https://www.linkedin.com/in/qht20/",
+        "https://www.twitch.tv/miablythe"
+      ]
+    },
+    "Layla Nguyen": {
+      "@type": "Person",
+      "@id": "https://worksheetzone.org#author/layla-nguyen",
+      "name": "Layla Nguyen",
+      "url": "https://worksheetzone.org/author/layla-nguyen-6583e320e0c742310ab6c76f",
+      "image": "https://storage.googleapis.com/worksheetzone/images/avatar.png",
+      "jobTitle": "Academic Specialist",
+      "sameAs": [
+        "https://x.com/laylanguye90",
+        "https://www.pinterest.com/laylanguyen24/",
+        "https://www.reddit.com/user/laylanguyen-01/",
+        "https://www.twitch.tv/laylanguyen20"
+      ]
+    },
+    "Elena Ngo": {
+      "@type": "Person",
+      "@id": "https://worksheetzone.org#author/elena-ngo",
+      "name": "Elena Ngo",
+      "url": "https://worksheetzone.org/author/elena-ngo-690804cf070948001b20ea8d",
+      "image": "https://storage.googleapis.com/worksheetzone/images/IMG_20241006_212302_980-1770027570188.jpg",
+      "jobTitle": "Academic Specialist",
+      "sameAs": [
+        "https://www.pinterest.com/ngophuongthao0543/_pins/"
+      ]
+    }
+  },
+
+  "category_map": {
+    "Holiday Fun": "https://worksheetzone.org/blog/category/holiday-fun",
+    "Back To School": "https://worksheetzone.org/blog/category/back-to-school",
+    "Christmas": "https://worksheetzone.org/blog/category/christmas",
+    "Cinco De Mayo": "https://worksheetzone.org/blog/category/cinco-de-mayo",
+    "Earth Day": "https://worksheetzone.org/blog/category/earth-day",
+    "Halloween": "https://worksheetzone.org/blog/category/halloween",
+    "Memorial Day": "https://worksheetzone.org/blog/category/memorial-day",
+    "St. Patrick's Day": "https://worksheetzone.org/blog/category/st-patricks-day",
+    "Thanksgiving": "https://worksheetzone.org/blog/category/thanksgiving",
+    "Subject Theory": "https://worksheetzone.org/blog/category/subject-theory",
+    "English Language Arts": "https://worksheetzone.org/blog/category/english-language-arts",
+    "Handwriting": "https://worksheetzone.org/blog/category/handwriting",
+    "Math": "https://worksheetzone.org/blog/category/math",
+    "Science": "https://worksheetzone.org/blog/category/science",
+    "Teacher Corners": "https://worksheetzone.org/blog/category/teacher-corners",
+    "Worksheetzone Research Gate": "https://worksheetzone.org/blog/category/worksheetzone-research-gate",
+    "Worksheetzone Tutorials": "https://worksheetzone.org/blog/category/worksheetzone-tutorials"
+  }
+}

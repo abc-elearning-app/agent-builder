@@ -238,36 +238,82 @@ def extract_faq_pairs(html: str) -> list:
 
 def extract_listicle_items(html: str, url: str) -> list:
     """
-    Extract H2 section headings from the article body as ItemList entries.
-    Skips intro/conclusion/FAQ/References headings.
+    Extract the actual list items for ItemList schema.
+
+    Strategy:
+      1. Isolate the main article body (after H1, before FAQ/References).
+      2. PRIMARY: collect <li> elements — these are the real enumerated items.
+         Extract a concise name from "Label: description..." patterns.
+      3. FALLBACK: if fewer than 3 <li> items found, use H3 headings instead
+         (some listicles use H3 per item rather than bullet points).
+
+    H2 headings are deliberately NOT used — they are section groupings, not items.
     """
     items = []
 
-    # Isolate body: from after the first H1 to the first FAQ/References heading
-    body_match = re.search(
-        r'</h1>(.*?)(?=<h[12][^>]*>[^<]*(?:FAQ|Frequently Asked|References|Conclusion|Summary))',
-        html, re.DOTALL | re.IGNORECASE
-    )
-    body = body_match.group(1) if body_match else html
+    # Isolate body: after the first </h1>, before the FAQ or References section
+    # Also need to handle inner HTML in headings (e.g. <h2><b>FAQ</b></h2>)
+    body_start = re.search(r'</h1>', html, re.IGNORECASE)
+    faq_start  = None
+    for m in re.finditer(r'<h[23][^>]*>(.*?)</h[23]>', html, re.DOTALL | re.IGNORECASE):
+        t = re.sub(r'<[^>]+>', '', m.group(1)).strip().lower()
+        if re.search(r'frequently asked|^faq[\s(]|^references$|^conclusion$|^summary$', t):
+            faq_start = m.start()
+            break
 
-    headings = re.findall(r'<h2[^>]*>(.*?)</h2>', body, re.DOTALL | re.IGNORECASE)
-    skip_pattern = re.compile(
-        r'^(introduction|overview|conclusion|summary|references|what is|why|how to|about)',
-        re.IGNORECASE
-    )
+    body_html = html[
+        (body_start.end() if body_start else 0) :
+        (faq_start if faq_start else len(html))
+    ]
 
-    for h in headings:
-        text = re.sub(r"<[^>]+>", "", h).strip()
-        text = re.sub(r"\s+", " ", text)
-        if not text or skip_pattern.match(text):
+    # ── Primary: <li> items ────────────────────────────────────────────────────
+    raw_lis = re.findall(r'<li[^>]*>(.*?)</li>', body_html, re.DOTALL | re.IGNORECASE)
+    for li_html in raw_lis:
+        text = re.sub(r'<[^>]+>', '', li_html)          # strip all tags
+        text = re.sub(r'&amp;', '&', text)
+        text = re.sub(r'&#\d+;|&\w+;', '', text)        # strip remaining entities
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        # Skip navigation/UI items (too short, or contain CSS/JS artefacts)
+        if len(text) < 15 or re.search(r'@media|\.v4-|javascript', text):
             continue
-        items.append({
-            "position": len(items) + 1,
-            "name": text,
-            "url": url,
-        })
+
+        # Extract a concise name: take the part before the first colon or
+        # first sentence boundary, capped at 80 chars
+        colon_idx = text.find(':')
+        if 0 < colon_idx < 80:
+            name = text[:colon_idx].strip()
+        else:
+            name = text[:80].strip()
+            # Trim at last word boundary if cut mid-word
+            if len(text) > 80 and ' ' in name:
+                name = name.rsplit(' ', 1)[0]
+
+        if not name:
+            continue
+
+        items.append({"position": len(items) + 1, "name": name, "url": url})
         if len(items) >= 10:
             break
+
+    # ── Fallback: H3 headings (for listicles structured as one H3 per item) ───
+    if len(items) < 3:
+        items = []
+        skip = re.compile(
+            r'^(introduction|overview|conclusion|summary|references|'
+            r'what is|why|how to|about|faq|frequently)',
+            re.IGNORECASE
+        )
+        h3s = re.findall(r'<h3[^>]*>(.*?)</h3>', body_html, re.DOTALL | re.IGNORECASE)
+        for h in h3s:
+            text = re.sub(r'<[^>]+>', '', h)
+            text = re.sub(r'&amp;', '&', text)
+            text = re.sub(r'\s+', ' ', text).strip()
+            if not text or skip.match(text):
+                continue
+            items.append({"position": len(items) + 1, "name": text, "url": url})
+            if len(items) >= 10:
+                break
 
     return items
 
@@ -296,7 +342,7 @@ def build_missing_entities(
             "@type": "BreadcrumbList",
             "@id":   f"{url}#breadcrumb",
             "itemListElement": [
-                {"@type": "ListItem", "position": 1, "name": "Trang chủ",    "item": SITE_URL},
+                {"@type": "ListItem", "position": 1, "name": "Home",         "item": SITE_URL},
                 {"@type": "ListItem", "position": 2, "name": category_name,  "item": category_url},
                 {"@type": "ListItem", "position": 3, "name": meta["headline"], "item": url},
             ],

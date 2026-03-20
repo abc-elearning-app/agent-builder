@@ -33,10 +33,20 @@ def tokenize(text: str) -> list:
     return [t for t in tokens if t not in STOP_WORDS and len(t) > 2]
 
 
+def strip_hash_suffix(segment: str) -> str:
+    """Remove trailing 20+ char hex hash from URL slugs like 'some-title-65b1c94ea8ee2c003ffbb56a'."""
+    return re.sub(r"-[0-9a-f]{20,}$", "", segment)
+
+
 def url_tokens(entry: dict) -> list:
-    """Extract tokens from every segment of the URL path (not just slug)."""
+    """Extract tokens from every segment of the URL path (not just slug).
+    Hash suffixes are stripped so coloring page / lesson plan IDs don't pollute the token space.
+    """
     path = entry["url"].replace("https://worksheetzone.org", "").strip("/")
-    raw = re.sub(r"[^a-z0-9 ]", " ", path.replace("/", " ").replace("-", " ").lower()).split()
+    segments = path.split("/")
+    clean_segments = [strip_hash_suffix(seg) for seg in segments]
+    clean_path = " ".join(clean_segments).replace("-", " ")
+    raw = re.sub(r"[^a-z ]", " ", clean_path.lower()).split()
     return [t for t in raw if t not in STOP_WORDS and len(t) > 2]
 
 

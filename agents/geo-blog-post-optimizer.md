@@ -61,7 +61,7 @@ EOF
 # 3. Verify Gemini CLI is logged in
 gemini --version
 
-# 4. Build the local sitemap cache (24,000+ URLs, takes ~60s)
+# 4. Build the local sitemap cache (33,000+ URLs, takes ~2–3 min)
 python3 scripts/build_sitemap_cache.py
 
 # 5. Share the Google Sheet + Google Drive folder with the service account
@@ -124,12 +124,16 @@ Builds and sends the GEO optimization prompt with:
 - Makes doc readable by anyone with the link
 
 ### find_internal_links.py
-- Loads `wzorg_link_cache.json` (24,681 real URLs)
+- Loads `wzorg_link_cache.json` (~33,777 URLs across blog, coloring pages, lesson plans, worksheet categories, tools, pages)
+- Strips hex hash suffixes from URL slugs before tokenizing (prevents noise from coloring page / lesson plan IDs)
 - Computes TF-IDF cosine similarity between post keywords and URL path tokens
 - Returns top 5 most semantically relevant URLs — no API calls, instant
 
 ### build_sitemap_cache.py
-- Recursively fetches all 11 worksheetzone.org sub-sitemaps
+- Dynamically discovers all sub-sitemaps from `sitemap-index.xml` (122 sub-sitemaps)
+- Includes: blog, coloring pages, lesson plans, pages, tools, worksheet categories (~33,777 URLs)
+- Excludes: individual worksheet pages (~97,000, too many) and author profile pages
+- Retries failed sitemaps up to 3 times with exponential backoff
 - Filters out hash-slug coloring pages, team member pages, utility pages
 - Saves `wzorg_link_cache.json`
 - Re-run when new content is published on the site

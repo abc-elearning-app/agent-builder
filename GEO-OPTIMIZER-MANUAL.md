@@ -74,7 +74,7 @@ The installer runs 7 steps automatically:
 | 4 | Installs all Python packages |
 | 5 | **Pauses here** — guides you to create Google Cloud credentials (see Step 2 below) |
 | 6 | Opens a browser to connect your Google account |
-| 7 | Builds the internal link cache (~24,000 URLs) |
+| 7 | Builds the internal link cache (~33,000 URLs) |
 
 When it finishes, it prints exactly which commands to run next.
 

@@ -57,9 +57,10 @@ scripts/wzorg_link_cache.json
 # Pinterest Pin Generator — user config, session state, generated output
 pinterest_config.env
 
-# School Email Outreach — user config and personal template
+# School Email Outreach — user config, personal template, temp files
 school_outreach_config.env
 email_template.txt
+schools_temp.json
 pinterest_pins_seen_urls.json
 pinterest_pins_*.csv
 # Gemini CLI temp scratch files

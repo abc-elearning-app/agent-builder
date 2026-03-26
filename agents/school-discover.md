@@ -52,7 +52,7 @@ Collect 20–50 schools with confirmed website URLs across the target states.
 
 ## Step 3 — Save school list to JSON file
 
-Write the confirmed schools to `/tmp/schools.json`:
+Write the confirmed schools to `schools_temp.json` in the current directory:
 
 ```json
 [
@@ -65,7 +65,7 @@ Write the confirmed schools to `/tmp/schools.json`:
 
 ```bash
 python3 scripts/run_school_discover.py \
-  --input /tmp/schools.json \
+  --input schools_temp.json \
   --limit {limit}
 # add --dry-run if the user requested it
 ```
@@ -82,7 +82,7 @@ Let the script run to completion. Do not interrupt.
 ## Step 5 — Clean up and report results
 
 ```bash
-rm -f /tmp/schools.json
+rm -f schools_temp.json
 ```
 
 After the script finishes, relay its summary to the user. If the sheet was updated, add:

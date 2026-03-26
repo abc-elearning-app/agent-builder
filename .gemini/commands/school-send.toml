@@ -1,0 +1,9 @@
+description = "Send bulk personalized emails to school contacts marked 'To send' in the Google Sheet"
+
+prompt = """
+@{school-send.md}
+
+---
+
+{{args}}
+"""

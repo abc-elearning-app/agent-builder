@@ -1,7 +1,7 @@
 description = "Discover contact emails for US schools and append verified results to Google Sheet"
 
 prompt = """
-@{school-discover.md}
+@{agents/school-discover.md}
 
 ---
 

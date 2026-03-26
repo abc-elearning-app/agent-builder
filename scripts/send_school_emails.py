@@ -126,10 +126,21 @@ def mark_sent(row: int, status: str, sent_at: str = "", reason: str = ""):
 
 def main():
     dry_run = "--dry-run" in sys.argv
-    args    = [a for a in sys.argv[1:] if not a.startswith("--")]
+
+    # Parse --limit N
+    limit = 0
+    for i, arg in enumerate(sys.argv[1:], 1):
+        if arg == "--limit" and i < len(sys.argv):
+            try:
+                limit = int(sys.argv[i + 1])
+            except (IndexError, ValueError):
+                print("ERROR: --limit requires a number", file=sys.stderr)
+                sys.exit(1)
+
+    args = [a for a in sys.argv[1:] if not a.startswith("--") and not a.isdigit()]
 
     if not args:
-        print("Usage: send_school_emails.py <email_template.txt> [--dry-run]")
+        print("Usage: send_school_emails.py <email_template.txt> [--dry-run] [--limit N]")
         sys.exit(1)
 
     template_path = args[0]
@@ -150,7 +161,11 @@ def main():
         print("   Open the sheet and type 'To send' in column L for rows you want to email.")
         sys.exit(0)
 
-    print(f"📬 {len(contacts)} contact(s) to send\n")
+    if limit:
+        contacts = contacts[:limit]
+        print(f"📬 {len(contacts)} contact(s) to send  (limit: {limit})\n")
+    else:
+        print(f"📬 {len(contacts)} contact(s) to send\n")
 
     # Preview first email
     first = contacts[0]

@@ -113,8 +113,9 @@ def build_link_candidates(content: str, post_url: str) -> str:
                 if r["url"] not in seen_urls:
                     seen_urls.add(r["url"])
                     candidates.append(r)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  ⚠️  find_links failed for query '{q[:50]}': {e}", file=sys.stderr)
+            break  # don't repeat for every query if cache is missing
 
     if not candidates:
         return "(no candidates found)"

@@ -36,11 +36,8 @@ nano ~/school-outreach/email_template.txt
 Template format:
 ```
 SUBJECT: Your subject line with {school_name}
-
 SENDER_NAME: Your Full Name
-
 ---
-
 Email body here. Available variables:
   {school_name}   — e.g. "Lincoln High School"
   {school_type}   — e.g. "High School"
@@ -48,14 +45,20 @@ Email body here. Available variables:
   {state}         — e.g. "TX"
 
 Your Name
-Your Company
-Your Address (required by CAN-SPAM)
+Your Title, Your Company
+https://yourwebsite.org
 
 ---
-To unsubscribe, reply with "unsubscribe" in the subject.
+
+Your Company Name
+Your Street Address, City, State ZIP
+
+If you'd prefer not to receive future emails, simply ignore this message and you will not be contacted again.
 ```
 
-Variables are substituted automatically per recipient when the email is sent.
+- No blank lines between `SUBJECT:`, `SENDER_NAME:`, and the first `---`
+- Second `---` (optional) separates the email body from the footer; the footer (address + unsubscribe) is included in the sent email
+- Variables are substituted automatically per recipient when the email is sent
 
 ---
 

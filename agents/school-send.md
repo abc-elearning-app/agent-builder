@@ -36,11 +36,23 @@ If the file is missing, tell the user:
 Create it by copying the example:
   cp email_template.example.txt email_template.txt
 
-Then edit it — format:
-  SUBJECT: Your subject with {school_name} if you want
-  SENDER_NAME: Your Name
+Then edit it — format (no blank lines between headers):
+  SUBJECT: Free Trial Invitation for {school_name} — Worksheetzone AI Worksheet Generators
+  SENDER_NAME: Dang Luu
   ---
   Email body here. Variables: {school_name}, {school_type}, {city}, {state}
+
+  Best regards,
+  Dang Luu
+  Co-founder, Worksheetzone
+  https://worksheetzone.org
+
+  ---
+
+  Worksheetzone
+  19 To Huu st., Nam Tu Liem, Hanoi, Vietnam
+
+  If you'd prefer not to receive future emails, simply ignore this message and you will not be contacted again.
 ```
 
 Stop until the template exists and validates cleanly.

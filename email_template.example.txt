@@ -1,37 +1,31 @@
-SUBJECT: Partnership Opportunity for {school_name} Students
+SUBJECT: Free Trial Invitation for {school_name} — Worksheetzone AI Worksheet Generators
+SENDER_NAME: Your Full Name
+---
+Hi there,
 
-SENDER_NAME: Your Name Here
+My name is [Your Name], Co-founder of Worksheetzone, and I'm reaching out to {school_name} with an offer I think your team will appreciate.
+
+We're inviting all teachers, academic staff, and students at {school_name} to a one-month free trial of Worksheetzone, including full access to:
+
+- Our entire Worksheetzone Library of ready-to-use resources
+- Our AI Worksheet Generators, which let educators create custom worksheets in seconds
+
+No credit card required. No commitment. Just a full month to explore everything.
+
+For school administrators, we also offer custom platform configurations at a negotiable price. If centralized access is something {school_name} would benefit from, I'd love to discuss what that looks like for your team in {city}, {state}.
+
+Getting started is simple — reply to this email and I'll send over the setup details for your {school_type}.
+
+Looking forward to hearing from you.
+
+Best regards,
+Your Name
+Your Title, Your Company
+https://yourwebsite.org
 
 ---
 
-Dear {school_name} Administration,
+Your Company Name
+Your Street Address, City, State ZIP
 
-[Your email body here. You can use the following variables anywhere:]
-
-  {school_name}  — e.g. "Lincoln High School"
-  {school_type}  — e.g. "High School" / "Secondary School" / "Education Center"
-  {city}         — e.g. "San Francisco"
-  {state}        — e.g. "CA"
-
-[Example body:]
-
-My name is Jane Smith, and I represent WorksheetZone — a free educational
-resource platform for K-12 students. We would love to explore a partnership
-with {school_name} in {city}, {state}.
-
-Our platform offers standards-aligned worksheets and practice materials that
-teachers at {school_type}s like yours have found valuable for supplementing
-classroom instruction.
-
-We would be delighted to offer your school free access to our premium content
-library for one semester with no commitment required.
-
-To learn more or schedule a 20-minute call, reply to this email or visit
-https://worksheetzone.org/schools.
-
----
-To unsubscribe from future messages, reply with "unsubscribe" in the subject.
-
-Jane Smith
-WorksheetZone Education Partnerships
-123 Main Street, Suite 400, San Francisco, CA 94105
+If you'd prefer not to receive future emails, simply ignore this message and you will not be contacted again.
